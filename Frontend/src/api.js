@@ -49,3 +49,26 @@ export const getEvaluationHistory = async () => {
     if (!response.ok) throw new Error('Failed to fetch history.');
     return await response.json();
 };
+
+/**
+ * SETTINGS: Fetch all dynamic configurations from Supabase
+ */
+export const getSystemSettings = async () => {
+    const response = await fetch(`${API_BASE_URL}/settings`);
+    if (!response.ok) throw new Error('Failed to fetch settings.');
+    return await response.json();
+};
+
+/**
+ * SETTINGS: Update a single configuration
+ */
+export const updateSystemSetting = async (key, value) => {
+    const response = await fetch(`${API_BASE_URL}/settings/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to update setting.');
+    return data;
+};

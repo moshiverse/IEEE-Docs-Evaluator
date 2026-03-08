@@ -4,7 +4,6 @@ import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.model.ValueRange;
 import com.ieee.evaluator.model.DriveFile;
 import com.ieee.evaluator.model.DeliverableConfig;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -21,28 +20,39 @@ public class SubmissionSyncService {
 
     private final Sheets sheetsService;
     private final GoogleSheetsService configLoader;
-
-    @Value("${google.sheets.spreadsheet-id}")
-    private String spreadsheetId;
-
-    @Value("${google.sheets.responses-range}")
-    private String responsesRange;
+    private final DynamicConfigService configService; // NEW: The Brains!
 
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("M/d/yyyy H:mm:ss");
 
-    public SubmissionSyncService(Sheets sheetsService, GoogleSheetsService configLoader) {
+    public SubmissionSyncService(Sheets sheetsService, GoogleSheetsService configLoader, DynamicConfigService configService) {
         this.sheetsService = sheetsService;
         this.configLoader = configLoader;
+        this.configService = configService;
     }
 
     public List<DriveFile> getLatestSubmissions() throws IOException {
-        // 1. Load Rules
+        // 1. Load Deadline Rules
         Map<String, DeliverableConfig> configMap;
         try {
             configMap = configLoader.getDeliverableConfigs();
         } catch (Exception e) {
             throw new IOException("Could not load deliverable rules: " + e.getMessage());
         }
+
+        // 2. DYNAMIC: Fetch Google configurations from Supabase Database
+        String spreadsheetId = configService.getValue("GOOGLE_SHEET_ID");
+        String responsesRange = configService.getValue("GOOGLE_RESPONSES_RANGE");
+
+        // 3. DYNAMIC: Fetch all Column Indices (0-based)
+        int colTimestamp = configService.getIntValue("COL_INDEX_TIMESTAMP"); 
+        int colName = configService.getIntValue("COL_INDEX_NAME");           
+        int colSection = configService.getIntValue("COL_INDEX_SECTION");     
+        int colTeam = configService.getIntValue("COL_INDEX_TEAM");           
+        int colType = configService.getIntValue("COL_INDEX_TYPE");           
+        int colUrl = configService.getIntValue("COL_INDEX_DOC_LINK");        
+
+        // Smart check: Find the highest column index we need, so we don't hit IndexOutOfBounds
+        int maxColRequired = Math.max(Math.max(Math.max(colTimestamp, colName), Math.max(colSection, colTeam)), Math.max(colType, colUrl));
 
         ValueRange response = sheetsService.spreadsheets().values()
                 .get(spreadsheetId, responsesRange)
@@ -55,14 +65,14 @@ public class SubmissionSyncService {
             for (int i = 0; i < values.size(); i++) {
                 List<Object> row = values.get(i);
                 
-                // Ensure we have all 7 columns (A through G)
-                if (row.size() >= 7) {
-                    String timestampStr = row.get(0).toString(); 
-                    String studentName = row.get(2).toString();  
-                    String section = row.get(3).toString();      
-                    String teamCode = row.get(4).toString();     
-                    String deliverableType = row.get(5).toString().trim(); 
-                    String url = row.get(6).toString().trim();             
+                // Ensure the row actually has enough data to safely pull from our dynamic columns
+                if (row.size() > maxColRequired) {
+                    String timestampStr = row.get(colTimestamp).toString(); 
+                    String studentName = row.get(colName).toString();  
+                    String section = row.get(colSection).toString();      
+                    String teamCode = row.get(colTeam).toString();     
+                    String deliverableType = row.get(colType).toString().trim(); 
+                    String url = row.get(colUrl).toString().trim();             
 
                     String fileId = extractIdFromUrl(url);
                     
@@ -85,7 +95,7 @@ public class SubmissionSyncService {
                             file.setName(statusPrefix + "[" + deliverableType + "] " + teamCode + " | " + studentName);
                             file.setSubmittedAt(timestampStr);
                             
-                            // We default to Google Docs mime type since we are dropping Drive folders
+                            // We default to Google Docs mime type since we are parsing direct URLs
                             file.setMimeType("application/vnd.google-apps.document");
 
                             submissions.add(file);
@@ -94,7 +104,7 @@ public class SubmissionSyncService {
                             System.err.println("Processing error for " + studentName + ": " + e.getMessage());
                         }
                     } else {
-                        System.err.println("DEBUG: Could not find valid File ID for " + studentName + " in Column G");
+                        System.err.println("DEBUG: Could not find valid File ID for " + studentName);
                     }
                 }
             }
@@ -103,7 +113,7 @@ public class SubmissionSyncService {
     }
 
     /**
-     * Moved the URL extraction here to keep the service independent.
+     * Extracts the Google Doc ID from the raw submitted URL
      */
     private String extractIdFromUrl(String url) {
         if (url == null || url.isEmpty()) return null;

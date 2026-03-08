@@ -3,7 +3,6 @@ package com.ieee.evaluator.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -18,19 +17,16 @@ import java.util.Map;
 @Slf4j
 public class OpenRouterService implements AiProvider {
 
-    @Value("${openrouter.api.key:}")
-    private String apiKey;
-
-    @Value("${openrouter.api.url:https://openrouter.ai/api/v1/chat/completions}")
-    private String apiUrl;
-
-    @Value("${openrouter.model:openrouter/free}")
-    private String model;
-
+    private final DynamicConfigService configService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    public OpenRouterService() {
+    // We can leave the URL and Model hardcoded for now, or move them to the DB later!
+    private final String apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+    private final String model = "openrouter/free"; 
+
+    public OpenRouterService(DynamicConfigService configService) {
+        this.configService = configService;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(15000); 
         factory.setReadTimeout(15000);    
@@ -45,13 +41,16 @@ public class OpenRouterService implements AiProvider {
 
     @Override
     public String analyze(String documentContent) throws Exception {
+        // DYNAMIC: Fetch the OpenRouter API key straight from Supabase!
+        String apiKey = configService.getValue("OPENROUTER_API_KEY");
+
         if (apiKey == null || apiKey.isEmpty()) {
-            return "SYSTEM ERROR: OpenRouter API key not configured.";
+            return "SYSTEM ERROR: OpenRouter API key not configured in the database.";
         }
 
         try {
             String prompt = buildAnalysisPrompt(documentContent);
-            return callOpenRouterAPI(prompt);
+            return callOpenRouterAPI(prompt, apiKey);
         } catch (Exception e) {
             log.error("AI analysis failed: {}", e.getMessage(), e);
             return "SYSTEM ERROR: AI analysis failed. " + e.getMessage();
@@ -66,30 +65,23 @@ public class OpenRouterService implements AiProvider {
         return """
             You are an IT professor evaluating a Software Requirements Specification (SRS) document based on standard IEEE 830 guidelines.
             
-            CRITICAL RULE: If the provided text is empty, unreadable, or is NOT a software engineering document (e.g., it is a certificate, a letter, or random text), you must state: "ERROR: This document does not appear to be a valid Software Engineering document. No IEEE analysis can be performed."
+            CRITICAL RULE: If the provided text is empty, unreadable, or is NOT a software engineering document, you must state: "ERROR: This document does not appear to be a valid Software Engineering document. No IEEE analysis can be performed."
             
             If it is a valid document, provide a professional evaluation with the following structure:
             ### Summary Evaluation
-            (A brief overview of the document's quality)
-
             ### Strengths
-            (Bullet points of specific strengths found in the text)
-
             ### Weaknesses
-            (Bullet points of missing IEEE 830 sections or poor quality areas)
-
             ### Conclusion
-            (Final assessment)
 
             DOCUMENT CONTENT:
             %s
             """.formatted(truncatedContent);
     }
 
-    private String callOpenRouterAPI(String prompt) {
+    private String callOpenRouterAPI(String prompt, String dynamicApiKey) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(apiKey);
+        headers.setBearerAuth(dynamicApiKey); // Uses the dynamic key!
         headers.set("HTTP-Referer", "http://localhost:8080");
         headers.set("X-Title", "IEEE Docs Evaluator");
 

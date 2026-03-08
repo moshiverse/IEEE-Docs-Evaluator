@@ -1,23 +1,21 @@
 package com.ieee.evaluator.service;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Component;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.Map;
 
-@Component
+@Service
 public class OpenAiProvider implements AiProvider {
 
-    @Value("${openai.api.key}")
-    private String openAiKey;
-
+    private final DynamicConfigService configService;
     private final RestTemplate restTemplate = new RestTemplate();
+
+    public OpenAiProvider(DynamicConfigService configService) {
+        this.configService = configService;
+    }
 
     @Override
     public String getProviderName() {
@@ -26,14 +24,29 @@ public class OpenAiProvider implements AiProvider {
 
     @Override
     @SuppressWarnings("unchecked")
-    public String analyze(String text) {
+    public String analyze(String text) throws Exception {
+        // DYNAMIC: Fetch the API key straight from Supabase!
+        String openAiKey = configService.getValue("OPENAI_API_KEY");
+        
         String url = "https://api.openai.com/v1/chat/completions";
         
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(openAiKey);
 
-        String prompt = "You are an IT professor evaluating a software engineering document. Summarize its strengths and weaknesses briefly based on standard IEEE guidelines:\n\n" + text;
+        String prompt = """
+            You are an IT professor evaluating a Software Requirements Specification (SRS) document based on standard IEEE 830 guidelines.
+            
+            CRITICAL RULE: If the provided text is empty, unreadable, or is NOT a software engineering document, you must state: "ERROR: This document does not appear to be a valid Software Engineering document. No IEEE analysis can be performed."
+            
+            If it is a valid document, provide a professional evaluation with the following structure:
+            ### Summary Evaluation
+            ### Strengths
+            ### Weaknesses
+            ### Conclusion
+
+            DOCUMENT CONTENT:
+            """ + text;
 
         Map<String, Object> body = Map.of(
             "model", "gpt-4o-mini",
