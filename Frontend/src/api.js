@@ -7,8 +7,7 @@ export const verifyStudentWithBackend = async (googleEmail) => {
     const response = await fetch(`${API_BASE_URL}/auth/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Only sending the email now!
-        body: JSON.stringify({ email: googleEmail }) 
+        body: JSON.stringify({ email: googleEmail })
     });
 
     if (!response.ok) {
@@ -19,58 +18,17 @@ export const verifyStudentWithBackend = async (googleEmail) => {
 };
 
 /**
- * DRIVE: Fetches files from a specific folder (Now used for Nested Navigation)
- */
-export const getDriveFiles = async (folderId) => {
-    const response = await fetch(`${API_BASE_URL}/drive/files/${folderId}`);
-    if (!response.ok) throw new Error('Could not load folder contents.');
-    return await response.json();
-};
-
-/**
- * DRIVE: Deletes a specific file or folder
- */
-export const deleteDriveFile = async (fileId) => {
-    const response = await fetch(`${API_BASE_URL}/drive/files/${fileId}`, {
-        method: 'DELETE',
-    });
-    if (!response.ok) throw new Error('Failed to delete file from Google Drive.');
-    return true; 
-};
-
-/**
- * DRIVE: Creates a new folder
- */
-export const createDriveFolder = async (folderName, parentId) => {
-    const response = await fetch(`${API_BASE_URL}/drive/folders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: folderName, parentId: parentId })
-    });
-    if (!response.ok) throw new Error('Failed to create folder.');
-    return await response.json();
-};
-
-/**
- * DRIVE: Search Function
- */
-export const searchDriveFiles = async (query) => {
-    const response = await fetch(`${API_BASE_URL}/drive/search?q=${encodeURIComponent(query)}`);
-    if (!response.ok) throw new Error('Search failed.');
-    return await response.json();
-};
-
-/**
- * DRIVE: Triggers the Java logic to read the Sheet, Route files, and fetch metadata
+ * SUBMISSIONS: Triggers the backend to read the Google Sheet and fetch live Google Doc URLs
  */
 export const syncSubmissionsWithBackend = async () => {
-    const response = await fetch(`${API_BASE_URL}/drive/sync-submissions`);
+    // UPDATED: Points to your new, clean SubmissionController
+    const response = await fetch(`${API_BASE_URL}/submissions/sync`);
     if (!response.ok) throw new Error('Submission sync failed.');
     return await response.json();
 };
 
 /**
- * AI: Triggers document extraction and AI analysis
+ * AI: Triggers Google Doc text extraction and AI analysis
  */
 export const analyzeDocumentWithAI = async (fileId, fileName, model) => {
     const response = await fetch(`${API_BASE_URL}/ai/analyze`, {
@@ -84,7 +42,7 @@ export const analyzeDocumentWithAI = async (fileId, fileName, model) => {
 };
 
 /**
- * AI: Fetches the evaluation history
+ * AI: Fetches the evaluation history from Supabase
  */
 export const getEvaluationHistory = async () => {
     const response = await fetch(`${API_BASE_URL}/ai/history`);

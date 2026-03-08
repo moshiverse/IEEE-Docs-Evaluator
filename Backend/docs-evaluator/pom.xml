@@ -71,16 +71,6 @@
 			<version>5.5.1</version>
 		</dependency>
 		<dependency>
-			<groupId>org.apache.tika</groupId>
-			<artifactId>tika-core</artifactId>
-			<version>3.2.3</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.tika</groupId>
-			<artifactId>tika-parsers-standard-package</artifactId>
-			<version>3.2.3</version>
-		</dependency>
-		<dependency>
 			<groupId>com.google.api-client</groupId>
 			<artifactId>google-api-client</artifactId>
 			<version>2.4.0</version>

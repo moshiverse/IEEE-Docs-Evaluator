@@ -13,13 +13,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class SubmissionSyncService {
 
     private final Sheets sheetsService;
-    private final GoogleDriveService driveService;
-    private final FileRoutingService fileRoutingService;
     private final GoogleSheetsService configLoader;
 
     @Value("${google.sheets.spreadsheet-id}")
@@ -30,11 +30,8 @@ public class SubmissionSyncService {
 
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("M/d/yyyy H:mm:ss");
 
-    public SubmissionSyncService(Sheets sheetsService, GoogleDriveService driveService, 
-                                 FileRoutingService fileRoutingService, GoogleSheetsService configLoader) {
+    public SubmissionSyncService(Sheets sheetsService, GoogleSheetsService configLoader) {
         this.sheetsService = sheetsService;
-        this.driveService = driveService;
-        this.fileRoutingService = fileRoutingService;
         this.configLoader = configLoader;
     }
 
@@ -67,7 +64,7 @@ public class SubmissionSyncService {
                     String deliverableType = row.get(5).toString().trim(); 
                     String url = row.get(6).toString().trim();             
 
-                    String fileId = driveService.extractIdFromUrl(url);
+                    String fileId = extractIdFromUrl(url);
                     
                     if (fileId != null) {
                         try {
@@ -79,19 +76,17 @@ public class SubmissionSyncService {
                                 isLate = submissionTime.isAfter(config.getDeadline());
                             }
 
-                            // Route to Teacher Drive
-                            try {
-                                fileRoutingService.processSubmission(section, teamCode, studentName, fileId, deliverableType, isLate);
-                            } catch (Exception e) {
-                                if (e.getMessage().contains("insufficientFilePermissions")) {
-                                    System.err.println("⚠️ PERMISSION DENIED: " + studentName + " (View-Only link)");
-                                }
-                            }
-
-                            DriveFile file = driveService.getFileById(fileId);
+                            // Create a representation of the file to send to the dashboard
+                            DriveFile file = new DriveFile();
+                            file.setId(fileId);
+                            file.setWebViewLink(url);
+                            
                             String statusPrefix = isLate ? "[LATE] " : "";
                             file.setName(statusPrefix + "[" + deliverableType + "] " + teamCode + " | " + studentName);
                             file.setSubmittedAt(timestampStr);
+                            
+                            // We default to Google Docs mime type since we are dropping Drive folders
+                            file.setMimeType("application/vnd.google-apps.document");
 
                             submissions.add(file);
                             
@@ -105,5 +100,19 @@ public class SubmissionSyncService {
             }
         }
         return submissions;
+    }
+
+    /**
+     * Moved the URL extraction here to keep the service independent.
+     */
+    private String extractIdFromUrl(String url) {
+        if (url == null || url.isEmpty()) return null;
+        Pattern pattern = Pattern.compile("(?:/d/|folders/|id=)([a-zA-Z0-9_-]{25,})");
+        Matcher matcher = pattern.matcher(url);
+        
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return url; // Fallback
     }
 }

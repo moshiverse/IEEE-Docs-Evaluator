@@ -16,7 +16,7 @@ import java.util.Map;
 
 @Service
 @Slf4j
-public class OpenRouterService {
+public class OpenRouterService implements AiProvider {
 
     @Value("${openrouter.api.key:}")
     private String apiKey;
@@ -38,7 +38,13 @@ public class OpenRouterService {
         this.objectMapper = new ObjectMapper();
     }
 
-    public String analyzeDocument(String documentContent) {
+    @Override
+    public String getProviderName() {
+        return "openrouter";
+    }
+
+    @Override
+    public String analyze(String documentContent) throws Exception {
         if (apiKey == null || apiKey.isEmpty()) {
             return "SYSTEM ERROR: OpenRouter API key not configured.";
         }

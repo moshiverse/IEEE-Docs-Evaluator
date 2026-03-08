@@ -1,12 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getDriveFiles, deleteDriveFile, createDriveFolder, searchDriveFiles, syncSubmissionsWithBackend, analyzeDocumentWithAI, getEvaluationHistory } from './api'; 
+import { syncSubmissionsWithBackend, analyzeDocumentWithAI, getEvaluationHistory } from './api'; 
 import { supabase } from './supabaseClient';
-
-const FolderIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '10px', color: '#2563eb' }}>
-        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-    </svg>
-);
 
 const FileIcon = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '10px', color: '#64748b' }}>
@@ -16,18 +10,14 @@ const FileIcon = () => (
 );
 
 const TeacherDashboard = ({ user }) => {
-    const ROOT_ID = '1coTNznsUzG_n7Oztc8EZJ4wpxlssbQ-z';
     const [currentView, setCurrentView] = useState('dashboard');
-    
-    const [navStack, setNavStack] = useState([{ id: ROOT_ID, name: 'IEEE Root' }]);
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSyncing, setIsSyncing] = useState(false);
     const [error, setError] = useState('');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [isSearching, setIsSearching] = useState(false);
-    const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
+    const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
 
+    // Modal & AI State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedFileForAi, setSelectedFileForAi] = useState(null);
     const [aiResult, setAiResult] = useState('');
@@ -36,24 +26,20 @@ const TeacherDashboard = ({ user }) => {
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
 
-    const currentFolder = navStack[navStack.length - 1];
-
     const getDisplayType = (mimeType) => {
-        if (!mimeType) return 'File';
-        if (mimeType === 'application/vnd.google-apps.folder') return 'Folder';
-        if (mimeType === 'application/pdf') return 'PDF';
-        if (mimeType.includes('wordprocessingml') || mimeType.includes('officedocument')) return 'DOCX';
-        return 'File';
+        if (mimeType === 'application/vnd.google-apps.document') return 'Google Doc';
+        return 'Document';
     };
 
-    const loadFiles = async (folderId) => {
+    const loadSubmissions = async () => {
         try {
             setLoading(true);
             setError('');
-            const data = await getDriveFiles(folderId);
+            // Calls our new clean endpoint to parse the Sheet and return the file URLs
+            const data = await syncSubmissionsWithBackend();
             setFiles(data);
         } catch (err) {
-            setError("Failed to load: " + err.message);
+            setError("Failed to load submissions: " + err.message);
         } finally {
             setLoading(false);
         }
@@ -72,68 +58,23 @@ const TeacherDashboard = ({ user }) => {
     };
 
     useEffect(() => {
-        if (currentView === 'dashboard' && !isSearching) {
-            loadFiles(currentFolder.id); 
+        if (currentView === 'dashboard') {
+            loadSubmissions(); 
         } else if (currentView === 'reports') {
             loadHistory();
         }
-    }, [currentFolder.id, isSearching, currentView]);
+    }, [currentView]);
 
     const handleManualSync = async () => {
         try {
             setIsSyncing(true);
             setError('');
-            await syncSubmissionsWithBackend(); 
-            await loadFiles(currentFolder.id); 
-            alert("Sync and organization complete!");
+            const data = await syncSubmissionsWithBackend(); 
+            setFiles(data);
         } catch (err) {
             setError("Sync failed: " + err.message);
         } finally {
             setIsSyncing(false);
-        }
-    };
-
-    const handleSearch = async (e) => {
-        const value = e.target.value;
-        setSearchTerm(value);
-
-        if (value.trim().length > 2) {
-            setIsSearching(true);
-            setLoading(true);
-            try {
-                const results = await searchDriveFiles(value);
-                setFiles(results);
-            } catch (err) {
-                setError("Search failed: " + err.message);
-            } finally {
-                setLoading(false);
-            }
-        } else if (value.trim().length === 0) {
-            setIsSearching(false);
-            loadFiles(currentFolder.id);
-        }
-    };
-
-    const handleFolderClick = (folderId, folderName) => {
-        setSearchTerm('');
-        setIsSearching(false);
-        setNavStack([...navStack, { id: folderId, name: folderName }]);
-    };
-
-    const handleBreadcrumbClick = (index) => {
-        setSearchTerm('');
-        setIsSearching(false);
-        setNavStack(navStack.slice(0, index + 1));
-    };
-
-    const handleDelete = async (fileId) => {
-        if (!window.confirm("Are you sure you want to delete this?")) return;
-        try {
-            setFiles(files.filter(f => f.id !== fileId));
-            await deleteDriveFile(fileId);
-        } catch (err) {
-            alert("Delete failed: " + err.message);
-            loadFiles(currentFolder.id);
         }
     };
 
@@ -156,8 +97,7 @@ const TeacherDashboard = ({ user }) => {
         setAiResult('');
         try {
             const data = await analyzeDocumentWithAI(selectedFileForAi.id, selectedFileForAi.name, modelName);
-            setAiResult(data.analysis);
-            // Refresh history after a new analysis is saved/updated
+            setAiResult(data.analysis || data);
             if (currentView === 'reports') loadHistory();
         } catch (err) {
             setAiResult('Error: ' + err.message);
@@ -167,17 +107,13 @@ const TeacherDashboard = ({ user }) => {
     };
 
     const sortedFiles = [...files].sort((a, b) => {
-        const typeA = getDisplayType(a.mimeType);
-        const typeB = getDisplayType(b.mimeType);
-        if (typeA === 'Folder' && typeB !== 'Folder') return -1;
-        if (typeA !== 'Folder' && typeB === 'Folder') return 1;
         if (sortConfig.key === 'name') {
             return sortConfig.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
         }
         if (sortConfig.key === 'date') {
             return sortConfig.direction === 'asc' 
-                ? new Date(a.createdTime) - new Date(b.createdTime) 
-                : new Date(b.createdTime) - new Date(a.createdTime);
+                ? new Date(a.submittedAt) - new Date(b.submittedAt) 
+                : new Date(b.submittedAt) - new Date(a.submittedAt);
         }
         return 0;
     });
@@ -193,27 +129,19 @@ const TeacherDashboard = ({ user }) => {
         main: { flex: 1, padding: '36px 40px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' },
         header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
         headerTitle: { fontSize: '24px', margin: '0 0 8px 0', color: '#0F172A', fontWeight: '700' },
-        breadcrumbContainer: { display: 'flex', gap: '8px', alignItems: 'center', fontSize: '14px', color: '#64748b' },
-        breadcrumbLink: { color: '#2563eb', cursor: 'pointer', textDecoration: 'none', fontWeight: '500' },
-        searchInput: { padding: '10px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '300px', fontSize: '14px', outline: 'none', backgroundColor: '#ffffff' },
-        newFolderBtn: { backgroundColor: '#ffffff', color: '#1e293b', border: '1px solid #e2e8f0', padding: '10px 20px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
-        refreshBtn: { backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #2563eb', padding: '10px 20px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
+        subtitle: { fontSize: '14px', color: '#64748b', margin: 0 },
         syncBtn: { backgroundColor: '#059669', color: '#ffffff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
         card: { backgroundColor: '#ffffff', borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', overflow: 'hidden' },
         tableContainer: { maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' },
         table: { width: '100%', borderCollapse: 'collapse' },
         th: { position: 'sticky', top: 0, padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', zIndex: 1, cursor: 'pointer' },
         td: { padding: '14px 16px', fontSize: '14px', color: '#1e293b', borderBottom: '1px solid #f1f5f9' },
-        folderName: { color: '#2563eb', cursor: 'pointer', fontWeight: '500' },
         badge: { backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '500' },
-        deleteBtn: { color: '#dc2626', background: 'none', border: '1px solid #fecaca', borderRadius: '6px', padding: '5px 12px', fontSize: '13px', cursor: 'pointer' },
         analyzeBtn: { color: '#059669', background: 'none', border: '1px solid #a7f3d0', borderRadius: '6px', padding: '5px 12px', fontSize: '13px', cursor: 'pointer' },
-        loadingRow: { animation: 'pulse-light 1.5s infinite ease-in-out' }
     };
 
     return (
         <div style={styles.root}>
-            {/* Inject Animation Styles */}
             <style>
                 {`
                 @keyframes pulse-light {
@@ -233,16 +161,10 @@ const TeacherDashboard = ({ user }) => {
                 <div style={styles.sidebarBrand}>IEEE Docs</div>
                 <div style={styles.sidebarRole}>Evaluator</div>
                 <nav>
-                    <div 
-                        style={currentView === 'dashboard' ? styles.navItemActive : styles.navItem}
-                        onClick={() => setCurrentView('dashboard')}
-                    >
+                    <div style={currentView === 'dashboard' ? styles.navItemActive : styles.navItem} onClick={() => setCurrentView('dashboard')}>
                         Dashboard
                     </div>
-                    <div 
-                        style={currentView === 'reports' ? styles.navItemActive : styles.navItem}
-                        onClick={() => setCurrentView('reports')}
-                    >
+                    <div style={currentView === 'reports' ? styles.navItemActive : styles.navItem} onClick={() => setCurrentView('reports')}>
                         AI Reports
                     </div>
                 </nav>
@@ -256,39 +178,12 @@ const TeacherDashboard = ({ user }) => {
                     <>
                         <header style={styles.header}>
                             <div>
-                                <h1 style={styles.headerTitle}>Teacher Dashboard</h1>
-                                <div style={styles.breadcrumbContainer}>
-                                    {!isSearching ? navStack.map((folder, index) => (
-                                        <span key={folder.id}>
-                                            <span 
-                                                style={index === navStack.length - 1 ? {} : styles.breadcrumbLink}
-                                                onClick={() => handleBreadcrumbClick(index)}
-                                            >
-                                                {folder.name}
-                                            </span>
-                                            {index < navStack.length - 1 && <span> / </span>}
-                                        </span>
-                                    )) : <span style={{ fontWeight: '600', color: '#2563eb' }}>Search Results</span>}
-                                </div>
+                                <h1 style={styles.headerTitle}>Live Submissions Dashboard</h1>
+                                <p style={styles.subtitle}>Sourced directly from the Google Sheets tracker</p>
                             </div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <input 
-                                    type="text" 
-                                    placeholder="Search Drive..." 
-                                    style={styles.searchInput}
-                                    value={searchTerm}
-                                    onChange={handleSearch}
-                                />
-                                <button onClick={() => loadFiles(currentFolder.id)} style={styles.refreshBtn}>Refresh List</button>
-                                <button onClick={async () => {
-                                    const name = prompt("Enter folder name:");
-                                    if(name) await createDriveFolder(name, currentFolder.id);
-                                    loadFiles(currentFolder.id);
-                                }} style={styles.newFolderBtn}>+ New Folder</button>
-                                <button onClick={handleManualSync} style={styles.syncBtn} disabled={isSyncing}>
-                                    {isSyncing ? "Syncing..." : "Sync Submissions"}
-                                </button>
-                            </div>
+                            <button onClick={handleManualSync} style={styles.syncBtn} disabled={isSyncing}>
+                                {isSyncing ? "Fetching Updates..." : "Sync Latest Submissions"}
+                            </button>
                         </header>
 
                         <div style={styles.card}>
@@ -296,44 +191,35 @@ const TeacherDashboard = ({ user }) => {
                                 <table style={styles.table}>
                                     <thead>
                                         <tr>
-                                            <th style={styles.th} onClick={() => requestSort('name')}>Name</th>
+                                            <th style={styles.th} onClick={() => requestSort('name')}>Submission Identity</th>
                                             <th style={styles.th}>Type</th>
-                                            <th style={styles.th} onClick={() => requestSort('date')}>Submitted At</th>
+                                            <th style={styles.th} onClick={() => requestSort('date')}>Date Submitted</th>
                                             <th style={styles.th}>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {loading ? (
+                                        {loading || isSyncing ? (
                                             [...Array(5)].map((_, i) => (
                                                 <tr key={i} className="loading-row">
                                                     <td colSpan="4" style={{ height: '50px', borderBottom: '1px solid #f1f5f9' }}></td>
                                                 </tr>
                                             ))
                                         ) : sortedFiles.length === 0 ? (
-                                            <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>No submissions found.</td></tr>
+                                            <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>No submissions found in the tracker.</td></tr>
                                         ) : sortedFiles.map(file => {
                                             const displayType = getDisplayType(file.mimeType);
                                             return (
                                                 <tr key={file.id}>
                                                     <td style={styles.td}>
                                                         <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                            {displayType === 'Folder' ? <FolderIcon /> : <FileIcon />}
-                                                            {displayType === 'Folder' ? (
-                                                                <span style={styles.folderName} onClick={() => handleFolderClick(file.id, file.name)}>{file.name}</span>
-                                                            ) : (
-                                                                <a href={file.webViewLink} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: '#1e293b', fontWeight: '500' }}>{file.name}</a>
-                                                            )}
+                                                            <FileIcon />
+                                                            <a href={file.webViewLink} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: '#1e293b', fontWeight: '500' }}>{file.name}</a>
                                                         </div>
                                                     </td>
                                                     <td style={styles.td}><span style={styles.badge}>{displayType}</span></td>
-                                                    <td style={styles.td}>{file.submittedAt || new Date(file.createdTime).toLocaleDateString()}</td>
+                                                    <td style={styles.td}>{file.submittedAt}</td>
                                                     <td style={styles.td}>
-                                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                                            {displayType !== 'Folder' && (
-                                                                <button onClick={() => handleAnalyzeClick(file)} style={styles.analyzeBtn}>Analyze</button>
-                                                            )}
-                                                            <button onClick={() => handleDelete(file.id)} style={styles.deleteBtn}>Delete</button>
-                                                        </div>
+                                                        <button onClick={() => handleAnalyzeClick(file)} style={styles.analyzeBtn}>Run AI Analysis</button>
                                                     </td>
                                                 </tr>
                                             );
@@ -350,9 +236,9 @@ const TeacherDashboard = ({ user }) => {
                         <header style={styles.header}>
                             <div>
                                 <h1 style={styles.headerTitle}>AI Evaluation History</h1>
-                                <div style={styles.breadcrumbContainer}>Saved results from Supabase Database</div>
+                                <p style={styles.subtitle}>Saved results from Supabase Database</p>
                             </div>
-                            <button onClick={loadHistory} style={styles.refreshBtn}>Refresh History</button>
+                            <button onClick={loadHistory} style={{ ...styles.syncBtn, backgroundColor: '#2563eb' }}>Refresh History</button>
                         </header>
 
                         <div style={styles.card}>
@@ -406,14 +292,16 @@ const TeacherDashboard = ({ user }) => {
                                     </div>
                                 </div>
                             )}
-                            {isAnalyzing && <div style={{ padding: '20px', textAlign: 'center', color: '#2563eb', fontWeight: '500' }}>AI is analyzing...</div>}
+                            {isAnalyzing && <div style={{ padding: '20px', textAlign: 'center', color: '#2563eb', fontWeight: '500' }}>Extracting text and running analysis...</div>}
                             {aiResult && (
                                 <div>
                                     <h3 style={{color: '#1e293b'}}>AI Evaluation Result:</h3>
                                     <div style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#334155', lineHeight: '1.6' }}>{aiResult}</div>
                                 </div>
                             )}
-                            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}><button onClick={() => setIsModalOpen(false)} style={styles.newFolderBtn}>Close</button></div>
+                            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
+                                <button onClick={() => setIsModalOpen(false)} style={{ backgroundColor: '#ffffff', color: '#1e293b', border: '1px solid #e2e8f0', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}>Close</button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -426,7 +314,9 @@ const TeacherDashboard = ({ user }) => {
                                 <p style={{margin: 0, color: '#64748b', fontSize: '14px'}}>File: {selectedHistoryItem.fileName}</p>
                             </div>
                             <div style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#334155', lineHeight: '1.6' }}>{selectedHistoryItem.evaluationResult}</div>
-                            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}><button onClick={() => setSelectedHistoryItem(null)} style={styles.newFolderBtn}>Close Report</button></div>
+                            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
+                                <button onClick={() => setSelectedHistoryItem(null)} style={{ backgroundColor: '#ffffff', color: '#1e293b', border: '1px solid #e2e8f0', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}>Close Report</button>
+                            </div>
                         </div>
                     </div>
                 )}
