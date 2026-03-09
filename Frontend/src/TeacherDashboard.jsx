@@ -9,7 +9,6 @@ const FileIcon = () => (
     </svg>
 );
 
-// Keys must exactly match the category column values in your DB
 const CATEGORY_CONFIG = {
     'AI':      { label: 'AI Keys',              color: '#7c3aed', bg: '#f5f3ff', border: '#ede9fe' },
     'GOOGLE':  { label: 'Google ID',            color: '#0369a1', bg: '#f0f9ff', border: '#e0f2fe' },
@@ -30,23 +29,16 @@ const SettingsSection = ({ categoryKey, settings, editedSettings, onSettingChang
                 <span style={{ fontSize: '13px', fontWeight: '700', color: config.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{config.label}</span>
                 <span style={{ marginLeft: 'auto', fontSize: '12px', color: config.color, opacity: 0.7 }}>{sectionSettings.length} setting{sectionSettings.length !== 1 ? 's' : ''}</span>
             </div>
-
             <div style={{ padding: '8px 24px' }}>
                 {sectionSettings.map((setting, idx) => {
-                    const currentValue = editedSettings[setting.key] !== undefined
-                        ? editedSettings[setting.key]
-                        : setting.value;
+                    const currentValue = editedSettings[setting.key] !== undefined ? editedSettings[setting.key] : setting.value;
                     const isDirty = editedSettings[setting.key] !== undefined;
-
                     return (
                         <div
                             key={setting.key}
                             style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '6px',
-                                paddingTop: '16px',
-                                paddingBottom: '16px',
+                                display: 'flex', flexDirection: 'column', gap: '6px',
+                                paddingTop: '16px', paddingBottom: '16px',
                                 borderBottom: idx < sectionSettings.length - 1 ? '1px solid #f1f5f9' : 'none',
                             }}
                         >
@@ -64,13 +56,9 @@ const SettingsSection = ({ categoryKey, settings, editedSettings, onSettingChang
                                 value={currentValue}
                                 onChange={(e) => onSettingChange(setting.key, e.target.value)}
                                 style={{
-                                    width: '100%',
-                                    padding: '9px 12px',
-                                    borderRadius: '6px',
+                                    width: '100%', padding: '9px 12px', borderRadius: '6px',
                                     border: isDirty ? `1px solid ${config.color}` : '1px solid #cbd5e1',
-                                    fontSize: '13px',
-                                    boxSizing: 'border-box',
-                                    color: '#1e293b',
+                                    fontSize: '13px', boxSizing: 'border-box', color: '#1e293b',
                                     backgroundColor: isDirty ? config.bg : '#ffffff',
                                     outline: 'none',
                                     fontFamily: setting.category === 'AI' ? 'monospace' : 'inherit',
@@ -115,6 +103,8 @@ const TeacherDashboard = ({ user }) => {
             setLoading(true);
             setError('');
             const data = await syncSubmissionsWithBackend();
+            // Backend already deduplicates via fileId+docType composite key.
+            // Just replace state wholesale — never append.
             setFiles(data);
         } catch (err) {
             setError("Failed to load submissions: " + err.message);
@@ -150,20 +140,18 @@ const TeacherDashboard = ({ user }) => {
     };
 
     useEffect(() => {
-        if (currentView === 'dashboard') {
-            loadSubmissions(); 
-        } else if (currentView === 'reports') {
-            loadHistory();
-        } else if (currentView === 'settings') {
-            loadSettings();
-        }
+        if (currentView === 'dashboard') loadSubmissions();
+        else if (currentView === 'reports') loadHistory();
+        else if (currentView === 'settings') loadSettings();
     }, [currentView]);
 
     const handleManualSync = async () => {
+        // Guard: prevent overlapping sync calls
+        if (loading || isSyncing) return;
         try {
             setIsSyncing(true);
             setError('');
-            const data = await syncSubmissionsWithBackend(); 
+            const data = await syncSubmissionsWithBackend();
             setFiles(data);
         } catch (err) {
             setError("Sync failed: " + err.message);
@@ -257,8 +245,7 @@ const TeacherDashboard = ({ user }) => {
 
     return (
         <div style={styles.root}>
-            <style>
-                {`
+            <style>{`
                 @keyframes pulse-light {
                     0% { background-color: #ffffff; }
                     50% { background-color: #eff6ff; }
@@ -269,8 +256,7 @@ const TeacherDashboard = ({ user }) => {
                 ::-webkit-scrollbar-track { background: #f1f5f9; }
                 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
                 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-                `}
-            </style>
+            `}</style>
 
             <aside style={styles.sidebar}>
                 <div style={styles.sidebarBrand}>IEEE Docs</div>
@@ -293,7 +279,11 @@ const TeacherDashboard = ({ user }) => {
                                 <h1 style={styles.headerTitle}>Live Submissions Dashboard</h1>
                                 <p style={styles.subtitle}>Sourced directly from the Google Sheets tracker</p>
                             </div>
-                            <button onClick={handleManualSync} style={styles.syncBtn} disabled={isSyncing}>
+                            <button
+                                onClick={handleManualSync}
+                                style={{ ...styles.syncBtn, opacity: (isSyncing || loading) ? 0.6 : 1, cursor: (isSyncing || loading) ? 'not-allowed' : 'pointer' }}
+                                disabled={isSyncing || loading}
+                            >
                                 {isSyncing ? "Fetching Updates..." : "Sync Latest Submissions"}
                             </button>
                         </header>
@@ -318,10 +308,10 @@ const TeacherDashboard = ({ user }) => {
                                             ))
                                         ) : sortedFiles.length === 0 ? (
                                             <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>No submissions found in the tracker.</td></tr>
-                                        ) : sortedFiles.map(file => {
+                                        ) : sortedFiles.map((file, index) => {
                                             const displayType = getDisplayType(file.mimeType);
                                             return (
-                                                <tr key={file.id}>
+                                                <tr key={`${file.id}-${index}`}>
                                                     <td style={styles.td}>
                                                         <div style={{ display: 'flex', alignItems: 'center' }}>
                                                             <FileIcon />
@@ -425,12 +415,10 @@ const TeacherDashboard = ({ user }) => {
                     </>
                 )}
 
-                {/* MODALS */}
                 {isModalOpen && (
                     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
                         <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '700px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
                             <h2 style={{ marginTop: 0, color: '#1e293b', flexShrink: 0 }}>Analyze: {selectedFileForAi?.name}</h2>
-
                             {!isAnalyzing && !aiResult && (
                                 <div>
                                     <p style={{ color: '#64748b' }}>Select an AI model to evaluate this document.</p>
@@ -440,9 +428,7 @@ const TeacherDashboard = ({ user }) => {
                                     </div>
                                 </div>
                             )}
-
                             {isAnalyzing && <div style={{ padding: '20px', textAlign: 'center', color: '#2563eb', fontWeight: '500' }}>Extracting text and running analysis...</div>}
-
                             {aiResult && (
                                 <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                                     <h3 style={{ color: '#1e293b', flexShrink: 0 }}>AI Evaluation Result:</h3>
@@ -451,7 +437,6 @@ const TeacherDashboard = ({ user }) => {
                                     </div>
                                 </div>
                             )}
-
                             <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
                                 <button onClick={() => setIsModalOpen(false)} style={{ backgroundColor: '#ffffff', color: '#1e293b', border: '1px solid #e2e8f0', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}>Close</button>
                             </div>
