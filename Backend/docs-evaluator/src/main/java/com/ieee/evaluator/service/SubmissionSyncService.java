@@ -20,7 +20,7 @@ public class SubmissionSyncService {
 
     private final Sheets sheetsService;
     private final GoogleSheetsService configLoader;
-    private final DynamicConfigService configService; // NEW: The Brains!
+    private final DynamicConfigService configService;
 
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("M/d/yyyy H:mm:ss");
 
@@ -31,7 +31,6 @@ public class SubmissionSyncService {
     }
 
     public List<DriveFile> getLatestSubmissions() throws IOException {
-        // 1. Load Deadline Rules
         Map<String, DeliverableConfig> configMap;
         try {
             configMap = configLoader.getDeliverableConfigs();
@@ -39,20 +38,20 @@ public class SubmissionSyncService {
             throw new IOException("Could not load deliverable rules: " + e.getMessage());
         }
 
-        // 2. DYNAMIC: Fetch Google configurations from Supabase Database
         String spreadsheetId = configService.getValue("GOOGLE_SHEET_ID");
         String responsesRange = configService.getValue("GOOGLE_RESPONSES_RANGE");
 
-        // 3. DYNAMIC: Fetch all Column Indices (0-based)
-        int colTimestamp = configService.getIntValue("COL_INDEX_TIMESTAMP"); 
-        int colName = configService.getIntValue("COL_INDEX_NAME");           
-        int colSection = configService.getIntValue("COL_INDEX_SECTION");     
-        int colTeam = configService.getIntValue("COL_INDEX_TEAM");           
-        int colType = configService.getIntValue("COL_INDEX_TYPE");           
-        int colUrl = configService.getIntValue("COL_INDEX_DOC_LINK");        
+        // Fetch Core Info Columns
+        int colTimestamp = getColumnIndexSafely("COL_INDEX_TIMESTAMP"); 
+        int colName = getColumnIndexSafely("COL_INDEX_NAME");          
+        int colSection = getColumnIndexSafely("COL_INDEX_SECTION");    
+        int colTeam = getColumnIndexSafely("COL_INDEX_TEAM");          
 
-        // Smart check: Find the highest column index we need, so we don't hit IndexOutOfBounds
-        int maxColRequired = Math.max(Math.max(Math.max(colTimestamp, colName), Math.max(colSection, colTeam)), Math.max(colType, colUrl));
+        // Fetch Specific Document Columns (Matches your SQL!)
+        int colSrs = getColumnIndexSafely("COL_INDEX_SRS");
+        int colSdd = getColumnIndexSafely("COL_INDEX_SDD");
+        int colSpmp = getColumnIndexSafely("COL_INDEX_SPMP");
+        int colStd = getColumnIndexSafely("COL_INDEX_STD");
 
         ValueRange response = sheetsService.spreadsheets().values()
                 .get(spreadsheetId, responsesRange)
@@ -62,59 +61,67 @@ public class SubmissionSyncService {
         List<DriveFile> submissions = new ArrayList<>();
 
         if (values != null) {
-            for (int i = 0; i < values.size(); i++) {
-                List<Object> row = values.get(i);
-                
-                // Ensure the row actually has enough data to safely pull from our dynamic columns
-                if (row.size() > maxColRequired) {
-                    String timestampStr = row.get(colTimestamp).toString(); 
-                    String studentName = row.get(colName).toString();  
-                    String section = row.get(colSection).toString();      
-                    String teamCode = row.get(colTeam).toString();     
-                    String deliverableType = row.get(colType).toString().trim(); 
-                    String url = row.get(colUrl).toString().trim();             
+            // Start at i=1 if row 0 is headers, or keep at 0 if your range ignores headers
+            for (List<Object> row : values) {
+                if (row.isEmpty()) continue;
 
-                    String fileId = extractIdFromUrl(url);
-                    
-                    if (fileId != null) {
-                        try {
-                            boolean isLate = false;
-                            DeliverableConfig config = configMap.get(deliverableType);
-                            
-                            if (config != null) {
-                                LocalDateTime submissionTime = LocalDateTime.parse(timestampStr, TIMESTAMP_FORMATTER);
-                                isLate = submissionTime.isAfter(config.getDeadline());
-                            }
+                String timestampStr = row.size() > colTimestamp && colTimestamp >= 0 ? row.get(colTimestamp).toString() : "Unknown Date";
+                String studentName = row.size() > colName && colName >= 0 ? row.get(colName).toString() : "Unknown Student";
+                String teamCode = row.size() > colTeam && colTeam >= 0 ? row.get(colTeam).toString() : "No Team";
 
-                            // Create a representation of the file to send to the dashboard
-                            DriveFile file = new DriveFile();
-                            file.setId(fileId);
-                            file.setWebViewLink(url);
-                            
-                            String statusPrefix = isLate ? "[LATE] " : "";
-                            file.setName(statusPrefix + "[" + deliverableType + "] " + teamCode + " | " + studentName);
-                            file.setSubmittedAt(timestampStr);
-                            
-                            // We default to Google Docs mime type since we are parsing direct URLs
-                            file.setMimeType("application/vnd.google-apps.document");
-
-                            submissions.add(file);
-                            
-                        } catch (Exception e) {
-                            System.err.println("Processing error for " + studentName + ": " + e.getMessage());
-                        }
-                    } else {
-                        System.err.println("DEBUG: Could not find valid File ID for " + studentName);
-                    }
-                }
+                // THE SPLITTER: Checks each column. Skips smoothly if the cell is blank.
+                extractAndAddFile(row, colSrs, "SRS", studentName, teamCode, timestampStr, configMap, submissions);
+                extractAndAddFile(row, colSdd, "SDD", studentName, teamCode, timestampStr, configMap, submissions);
+                extractAndAddFile(row, colSpmp, "SPMP", studentName, teamCode, timestampStr, configMap, submissions);
+                extractAndAddFile(row, colStd, "STD", studentName, teamCode, timestampStr, configMap, submissions);
             }
         }
         return submissions;
     }
 
-    /**
-     * Extracts the Google Doc ID from the raw submitted URL
-     */
+    private int getColumnIndexSafely(String key) {
+        try {
+            String value = configService.getValue(key);
+            return (value != null && !value.trim().isEmpty()) ? Integer.parseInt(value.trim()) : -1;
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    private void extractAndAddFile(List<Object> row, int colIndex, String docType, String studentName, String teamCode, String timestampStr, Map<String, DeliverableConfig> configMap, List<DriveFile> submissions) {
+        if (colIndex < 0 || colIndex >= row.size()) return;
+
+        String url = row.get(colIndex).toString().trim();
+        if (url.isEmpty()) return; // Ignored if left blank by student!
+
+        String fileId = extractIdFromUrl(url);
+        
+        if (fileId != null) {
+            boolean isLate = false;
+            DeliverableConfig config = configMap.get(docType);
+            
+            if (config != null && !timestampStr.equals("Unknown Date")) {
+                try {
+                    LocalDateTime submissionTime = LocalDateTime.parse(timestampStr, TIMESTAMP_FORMATTER);
+                    isLate = submissionTime.isAfter(config.getDeadline());
+                } catch (Exception e) {
+                    System.err.println("Could not parse date for " + studentName + ": " + e.getMessage());
+                }
+            }
+
+            DriveFile file = new DriveFile();
+            file.setId(fileId);
+            file.setWebViewLink(url);
+            
+            String statusPrefix = isLate ? "[LATE] " : "";
+            file.setName(statusPrefix + "[" + docType + "] " + teamCode + " | " + studentName);
+            file.setSubmittedAt(timestampStr);
+            file.setMimeType("application/vnd.google-apps.document");
+
+            submissions.add(file);
+        }
+    }
+
     private String extractIdFromUrl(String url) {
         if (url == null || url.isEmpty()) return null;
         Pattern pattern = Pattern.compile("(?:/d/|folders/|id=)([a-zA-Z0-9_-]{25,})");
@@ -123,6 +130,6 @@ public class SubmissionSyncService {
         if (matcher.find()) {
             return matcher.group(1);
         }
-        return url; // Fallback
+        return null; 
     }
 }
