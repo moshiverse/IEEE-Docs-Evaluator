@@ -26,6 +26,16 @@
   margin-bottom: 1rem;
 }
 
+.teacher-sidebar__spacer {
+  flex: 1;
+}
+
+.teacher-sidebar__signout {
+  width: 100%;
+  text-align: center;
+  margin-top: auto;
+}
+
 .nav-btn {
   border: 1px solid var(--sidebar-border);
   border-radius: 10px;

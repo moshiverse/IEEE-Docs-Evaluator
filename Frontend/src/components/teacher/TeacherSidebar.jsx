@@ -24,7 +24,9 @@ function TeacherSidebar({ currentView, onNavigate }) {
         ))}
       </nav>
 
-      <button className="btn btn--ghost" onClick={signOut}>
+      <div className="teacher-sidebar__spacer" />
+
+      <button className="btn btn--ghost teacher-sidebar__signout" onClick={signOut}>
         Sign Out
       </button>
     </aside>
