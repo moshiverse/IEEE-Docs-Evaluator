@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   analyzeSubmission,
+  fetchClassRoster,
   fetchTeacherHistory,
   fetchTeacherSettings,
   fetchTeacherSubmissions,
@@ -8,7 +9,7 @@ import {
   saveSetting,
   sendEvaluation,
 } from '../services/dashboardService';
-import { buildFilterOptions, extractSubmissionMeta, filterSubmissions, sortSubmissions } from '../utils/dashboardUtils';
+import { buildFilterOptions, extractSubmissionMeta, filterSubmissions, normalizeSection, sortSubmissions } from '../utils/dashboardUtils';
 
 export function useTeacherDashboard(showToast) {
   const [currentView, setCurrentView] = useState('submissions'); // change to 'dashboard' later if dashboard page has been created
@@ -33,6 +34,7 @@ export function useTeacherDashboard(showToast) {
   const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
   const [isEditingReport, setIsEditingReport] = useState(false);
   const [editedReportText, setEditedReportText] = useState('');
+  const [editedTeacherFeedback, setEditedTeacherFeedback] = useState('');
   const [reportSearchQuery, setReportSearchQuery] = useState('');
   const [reportStatusFilter, setReportStatusFilter] = useState('');
   const [reportDocTypeFilter, setReportDocTypeFilter] = useState('');
@@ -44,6 +46,8 @@ export function useTeacherDashboard(showToast) {
   const [editedSettings, setEditedSettings] = useState({});
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [isSavingAll, setIsSavingAll] = useState(false);
+
+  const [roster, setRoster] = useState([]);
 
   async function loadSubmissions() {
     try {
@@ -85,13 +89,33 @@ export function useTeacherDashboard(showToast) {
     }
   }
 
+  const analyzedFileIds = useMemo(() => {
+    return new Set(historyLogs.map((h) => h.fileId));
+  }, [historyLogs]);
+
   useEffect(() => {
-    if (currentView === 'submissions') loadSubmissions();
+    if (currentView === 'submissions') {
+      loadSubmissions();
+      loadHistory();
+    }
     if (currentView === 'reports') loadHistory();
     if (currentView === 'settings') loadSettings();
+    // Fetch roster for any view that needs section/team filters
+    if (currentView === 'submissions' || currentView === 'reports') {
+      fetchClassRoster().then(setRoster).catch(() => {});
+    }
   }, [currentView]);
 
-  const filterOptions = useMemo(() => buildFilterOptions(files), [files]);
+  const filterOptions = useMemo(() => {
+    const base = buildFilterOptions(files);
+    if (roster.length > 0) {
+      // Use roster as the source of truth for sections and team codes
+      const rosterSections = [...new Set(roster.map((s) => s.section).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const rosterTeamCodes = [...new Set(roster.map((s) => s.groupCode).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      return { ...base, sections: rosterSections, teamCodes: rosterTeamCodes };
+    }
+    return base;
+  }, [files, roster]);
 
   const filteredFiles = useMemo(
     () =>
@@ -106,6 +130,65 @@ export function useTeacherDashboard(showToast) {
   );
 
   const sortedFiles = useMemo(() => sortSubmissions(filteredFiles, sortConfig), [filteredFiles, sortConfig]);
+
+  const submissionStats = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const isSearchingStudent = query.length > 0;
+
+    // Scope submissions by section/team filters (normalize both sides for GO1/G01 consistency)
+    const scoped = files.filter((item) => {
+      const meta = extractSubmissionMeta(item.name);
+      if (selectedSection && meta.section !== normalizeSection(selectedSection)) return false;
+      if (selectedTeamCode && meta.teamCode !== selectedTeamCode.toUpperCase()) return false;
+      return true;
+    });
+
+    // Scope roster by section/team filters (compare raw values since dropdown now uses roster values directly)
+    const scopedRoster = roster.filter((s) => {
+      if (selectedSection && s.section !== selectedSection) return false;
+      if (selectedTeamCode && s.groupCode?.toUpperCase() !== selectedTeamCode.toUpperCase()) return false;
+      return true;
+    });
+
+    if (isSearchingStudent) {
+      const matched = scoped.filter((item) => {
+        const meta = extractSubmissionMeta(item.name);
+        return meta.studentName.toLowerCase().includes(query);
+      });
+
+      // Also search in roster for the student name
+      const rosterMatched = scopedRoster.filter((s) => s.studentName?.toLowerCase().includes(query));
+      const matchedNames = [...new Set([
+        ...matched.map((f) => extractSubmissionMeta(f.name).studentName),
+        ...rosterMatched.map((s) => s.studentName),
+      ].filter(Boolean))];
+
+      const displayName = matchedNames.length === 1 ? matchedNames[0] : null;
+
+      return {
+        studentName: displayName,
+        studentCount: matchedNames.length,
+        docCounts: ['SRS', 'SDD', 'SPMP', 'STD'].map((type) => ({
+          type,
+          count: matched.filter((f) => extractSubmissionMeta(f.name).documentType === type).length,
+        })),
+      };
+    }
+
+    // Use roster count when available, fallback to submission-based count
+    const studentCount = scopedRoster.length > 0
+      ? scopedRoster.length
+      : new Set(scoped.map((item) => extractSubmissionMeta(item.name).studentName).filter(Boolean)).size;
+
+    return {
+      studentName: null,
+      studentCount,
+      docCounts: ['SRS', 'SDD', 'SPMP', 'STD'].map((type) => ({
+        type,
+        count: scoped.filter((f) => extractSubmissionMeta(f.name).documentType === type).length,
+      })),
+    };
+  }, [files, roster, selectedSection, selectedTeamCode, searchQuery]);
 
   const reportDocTypeOptions = useMemo(
     () =>
@@ -126,12 +209,23 @@ export function useTeacherDashboard(showToast) {
       if (meta.teamCode) teamCodes.add(meta.teamCode);
     });
 
+    // Use roster as source of truth for sections and team codes when available
+    if (roster.length > 0) {
+      const rosterSections = [...new Set(roster.map((s) => s.section).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const rosterTeamCodes = [...new Set(roster.map((s) => s.groupCode).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      return {
+        students: [...students].sort((a, b) => a.localeCompare(b)),
+        sections: rosterSections,
+        teamCodes: rosterTeamCodes,
+      };
+    }
+
     return {
       students: [...students].sort((a, b) => a.localeCompare(b)),
       sections: [...sections].sort((a, b) => a.localeCompare(b)),
       teamCodes: [...teamCodes].sort((a, b) => a.localeCompare(b)),
     };
-  }, [historyLogs]);
+  }, [historyLogs, roster]);
 
   const filteredHistoryLogs = useMemo(() => {
     const query = reportSearchQuery.trim().toLowerCase();
@@ -144,8 +238,8 @@ export function useTeacherDashboard(showToast) {
       if (reportStatusFilter === 'pending' && log.isSent) return false;
       if (reportDocTypeFilter && docType !== reportDocTypeFilter) return false;
       if (reportSelectedStudent && meta.studentName !== reportSelectedStudent) return false;
-      if (reportSelectedSection && meta.section !== reportSelectedSection) return false;
-      if (reportSelectedTeamCode && meta.teamCode !== reportSelectedTeamCode) return false;
+      if (reportSelectedSection && meta.section !== normalizeSection(reportSelectedSection)) return false;
+      if (reportSelectedTeamCode && meta.teamCode !== reportSelectedTeamCode.toUpperCase()) return false;
 
       if (query) {
         const searchable = [
@@ -233,6 +327,7 @@ export function useTeacherDashboard(showToast) {
   function startEditingHistory(item) {
     setSelectedHistoryItem(item);
     setEditedReportText(item.evaluationResult);
+    setEditedTeacherFeedback(item.teacherFeedback || '');
     setIsEditingReport(false);
     console.log(item);
   }
@@ -240,8 +335,8 @@ export function useTeacherDashboard(showToast) {
   async function saveEditedHistory() {
     if (!selectedHistoryItem) return;
     try {
-      await saveEvaluation(selectedHistoryItem.id, editedReportText);
-      const updated = { ...selectedHistoryItem, evaluationResult: editedReportText };
+      await saveEvaluation(selectedHistoryItem.id, editedReportText, editedTeacherFeedback);
+      const updated = { ...selectedHistoryItem, evaluationResult: editedReportText, teacherFeedback: editedTeacherFeedback };
       setSelectedHistoryItem(updated);
       setHistoryLogs((prev) => prev.map((log) => (log.id === updated.id ? updated : log)));
       setIsEditingReport(false);
@@ -293,6 +388,7 @@ export function useTeacherDashboard(showToast) {
     setCurrentView,
     files: sortedFiles,
     filterOptions,
+    submissionStats,
     selectedStudent,
     selectedSection,
     selectedTeamCode,
@@ -300,6 +396,7 @@ export function useTeacherDashboard(showToast) {
     searchQuery,
     loading,
     isSyncing,
+    analyzedFileIds,
     error,
     historyLogs: filteredHistoryLogs,
     allHistoryCount: historyLogs.length,
@@ -327,6 +424,8 @@ export function useTeacherDashboard(showToast) {
     setIsEditingReport,
     editedReportText,
     setEditedReportText,
+    editedTeacherFeedback,
+    setEditedTeacherFeedback,
     handleManualSync,
     requestSort,
     setSelectedStudent,

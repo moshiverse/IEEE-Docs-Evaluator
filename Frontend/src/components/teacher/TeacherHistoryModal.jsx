@@ -5,8 +5,10 @@ function TeacherHistoryModal({
   item,
   isEditing,
   editedText,
+  editedFeedback,
   onEditToggle,
   onEditText,
+  onEditFeedback,
   onSave,
   onSend,
   onCopy,
@@ -27,6 +29,8 @@ function TeacherHistoryModal({
     </div>
   );
 
+  const hasFeedback = item?.teacherFeedback?.trim();
+
   return (
     <AppModal
       isOpen={Boolean(item)}
@@ -36,13 +40,41 @@ function TeacherHistoryModal({
       footer={footer}
     >
       {isEditing ? (
-        <textarea
-          className="report-textarea"
-          value={editedText}
-          onChange={(e) => onEditText(e.target.value)}
-        />
+        <div className="report-edit-container">
+          <div className="report-edit-section">
+            <label className="report-edit-label">AI Evaluation</label>
+            <textarea
+              className="report-textarea"
+              value={editedText}
+              onChange={(e) => onEditText(e.target.value)}
+            />
+          </div>
+          <div className="report-edit-section">
+            <label className="report-edit-label report-edit-label--feedback">Teacher Feedback</label>
+            <textarea
+              className="report-textarea report-textarea--feedback"
+              value={editedFeedback}
+              onChange={(e) => onEditFeedback(e.target.value)}
+              placeholder="Add your own feedback here..."
+            />
+          </div>
+        </div>
       ) : (
-        <EvaluationReport text={item?.evaluationResult}/>
+        <div className="report-view-container">
+          <EvaluationReport text={item?.evaluationResult} />
+          {hasFeedback && (
+            <div className="eval-card eval-card--feedback">
+              <div className="eval-card__header">
+                <span className="eval-card__heading">Teacher Feedback</span>
+              </div>
+              <div className="eval-card__body">
+                <p className="eval-card__note" style={{ fontStyle: 'normal' }}>
+                  {item.teacherFeedback}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </AppModal>
   );

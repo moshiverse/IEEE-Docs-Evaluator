@@ -1,5 +1,6 @@
 import {
   analyzeDocumentWithAI,
+  getClassRoster,
   getEvaluationHistory,
   getStudentReports,
   getSystemSettings,
@@ -34,10 +35,14 @@ export async function analyzeSubmission(fileId, fileName, model) {
   return analyzeDocumentWithAI(fileId, fileName, model);
 }
 
-export async function saveEvaluation(id, text) {
-  return updateEvaluationResult(id, text);
+export async function saveEvaluation(id, text, teacherFeedback) {
+  return updateEvaluationResult(id, text, teacherFeedback);
 }
 
 export async function sendEvaluation(id) {
   return sendEvaluationToStudent(id);
+}
+
+export async function fetchClassRoster() {
+  return getClassRoster();
 }

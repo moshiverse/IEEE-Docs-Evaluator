@@ -52,24 +52,23 @@ function TeacherDashboardPage() {
               }
             />
             <TeacherFilterPanel
-              students={vm.filterOptions.students}
               sections={vm.filterOptions.sections}
               teamCodes={vm.filterOptions.teamCodes}
               docTypes={vm.filterOptions.docTypes}
-              selectedStudent={vm.selectedStudent}
               selectedSection={vm.selectedSection}
               selectedTeamCode={vm.selectedTeamCode}
               selectedDocType={vm.selectedDocType}
-              onStudentChange={vm.setSelectedStudent}
               onSectionChange={vm.setSelectedSection}
               onTeamCodeChange={vm.setSelectedTeamCode}
               onDocTypeChange={vm.setSelectedDocType}
               onClear={vm.clearFilters}
+              stats={vm.submissionStats}
             />
             <TeacherSubmissionsTable
               files={vm.files}
               loading={vm.loading}
               isSyncing={vm.isSyncing}
+              analyzedFileIds={vm.analyzedFileIds}
               onSort={vm.requestSort}
               onAnalyze={vm.openAnalyzeModal}
             />
@@ -99,11 +98,9 @@ function TeacherDashboardPage() {
             />
 
             <TeacherFilterPanel
-              students={vm.reportFilterOptions.students}
               sections={vm.reportFilterOptions.sections}
               teamCodes={vm.reportFilterOptions.teamCodes}
               docTypes={vm.filterOptions.docTypes}
-              selectedStudent={vm.reportSelectedStudent}
               selectedSection={vm.reportSelectedSection}
               selectedTeamCode={vm.reportSelectedTeamCode}
               selectedDocType={vm.reportDocTypeFilter}
@@ -113,7 +110,6 @@ function TeacherDashboardPage() {
                 { value: 'pending', label: 'Pending' },
               ]}
               selectedStatus={vm.reportStatusFilter}
-              onStudentChange={vm.setReportSelectedStudent}
               onSectionChange={vm.setReportSelectedSection}
               onTeamCodeChange={vm.setReportSelectedTeamCode}
               onDocTypeChange={vm.setReportDocTypeFilter}
@@ -167,8 +163,10 @@ function TeacherDashboardPage() {
         item={vm.selectedHistoryItem}
         isEditing={vm.isEditingReport}
         editedText={vm.editedReportText}
+        editedFeedback={vm.editedTeacherFeedback}
         onEditToggle={vm.setIsEditingReport}
         onEditText={vm.setEditedReportText}
+        onEditFeedback={vm.setEditedTeacherFeedback}
         onSave={vm.saveEditedHistory}
         onSend={vm.sendHistoryToStudent}
         onCopy={(text) => {

@@ -27,10 +27,14 @@ function renderBody(body)
     {
         const trimmed = line.trim();
 
-        if(trimmed.startsWith('- ')) 
+        if(trimmed.startsWith('- ') || trimmed.startsWith('* ')) 
         {
             list.push(<li key={i}>{renderInline(trimmed.slice(2))}</li>);
-        } 
+        }
+        else if(/^\d+[\.\)]\s/.test(trimmed))
+        {
+            list.push(<li key={i}>{renderInline(trimmed.replace(/^\d+[\.\)]\s/, ''))}</li>);
+        }
         else if(trimmed === '') 
         {
             flush();
@@ -57,10 +61,22 @@ function parseEvaluationSections(text)
         normalized = normalized.slice(1, -1).trim();
     }
 
-    // Split at any known section heading in all supported formats:
-    // **Heading**[optional inline body], **Heading**  \n, Heading:, plain Heading
-    const blocks = normalized.split(
-        /\n(?=\*\*(?:Summary|Strengths|Weaknesses|Conclusion)\*\*|(?:Summary|Strengths|Weaknesses|Conclusion):?\s*(?:\n|$))/
+    // Heading keyword pattern used throughout
+    const KW = 'Summary|Strengths|Weaknesses|Conclusion';
+
+    // Split at any known section heading in all supported formats.
+    // The lookahead matches headings that may appear at start-of-string or after \n:
+    //   ### **Summary**   ### Summary   **Summary**   **Summary:**   Summary:   Summary
+    const splitRe = new RegExp(
+        `(?:^|\\n)(?=\\s*#{1,3}\\s*(?:\\*\\*)?(?:${KW})(?:\\*\\*)?|\\s*\\*\\*(?:${KW}):?\\*\\*|\\s*(?:${KW}):?\\s*(?:\\n|$))`,
+    );
+    const blocks = normalized.split(splitRe).filter(b => b.trim());
+
+    // Match heading from the first line of each block
+    const headingRe = new RegExp(
+        `^\\s*(?:#{1,3}\\s*)?\\*\\*(${KW}):?\\*\\*:?\\s*(.*)` +   // **Heading**, **Heading:**, ### **Heading**
+        `|^\\s*(?:#{1,3}\\s+)(${KW}):?\\s*$` +                       // ### Heading, ## Heading
+        `|^\\s*(${KW}):?\\s*$`                                        // Heading, Heading:
     );
 
     const sections = blocks.map((block) => 
@@ -69,23 +85,13 @@ function parseEvaluationSections(text)
         const firstLine = nl === -1 ? block : block.slice(0, nl);
         const rest = nl === -1 ? '' : block.slice(nl + 1);
 
-        // Bold heading, possibly with inline body: **Heading** or **Heading**body text
-        let m = firstLine.match(/^\*\*(Summary|Strengths|Weaknesses|Conclusion)\*\*\s*(.*)/);
-        if (m) 
-        {
-            const inlineBody = m[2].trim();
-            const fullBody = [inlineBody, rest.trim()].filter(Boolean).join('\n');
-            return { heading: m[1].trim(), body: fullBody };
-        }
+        const m = firstLine.match(headingRe);
+        if (!m) return null;
 
-        // Plain or colon heading: Heading or Heading:
-        m = firstLine.match(/^(Summary|Strengths|Weaknesses|Conclusion):?\s*$/);
-        if (m) 
-        {
-            return { heading: m[1].trim(), body: rest.trim() };
-        }
-
-        return null;
+        const heading = (m[1] || m[3] || m[4]).trim();
+        const inlineBody = (m[2] || '').trim();
+        const fullBody = [inlineBody, rest.trim()].filter(Boolean).join('\n');
+        return { heading, body: fullBody };
     }).filter(Boolean);
 
     return sections.length > 0 ? sections : null;

@@ -28,8 +28,8 @@ public class OpenRouterService implements AiProvider {
     public OpenRouterService(DynamicConfigService configService) {
         this.configService = configService;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(15000); 
-        factory.setReadTimeout(15000);    
+        factory.setConnectTimeout(30000); 
+        factory.setReadTimeout(60000);    
         this.restTemplate = new RestTemplate(factory);
         this.objectMapper = new ObjectMapper();
     }

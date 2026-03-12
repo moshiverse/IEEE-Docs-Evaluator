@@ -1,6 +1,6 @@
 import { getDisplayType } from '../../utils/dashboardUtils';
 
-function TeacherSubmissionsTable({ files, loading, isSyncing, onSort, onAnalyze }) {
+function TeacherSubmissionsTable({ files, loading, isSyncing, analyzedFileIds, onSort, onAnalyze }) {
   return (
     <div className="card">
       <table className="app-table" id="teacher-submission-table">
@@ -33,7 +33,7 @@ function TeacherSubmissionsTable({ files, loading, isSyncing, onSort, onAnalyze 
                 <td>{file.submittedAt}</td>
                 <td>
                   <button className="btn btn--soft" onClick={() => onAnalyze(file)}>
-                    Run AI Analysis
+                    {analyzedFileIds?.has(file.id) ? 'Re-Evaluate' : 'Run AI Analysis'}
                   </button>
                 </td>
               </tr>

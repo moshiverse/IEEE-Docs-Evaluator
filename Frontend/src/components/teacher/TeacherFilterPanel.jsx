@@ -1,17 +1,16 @@
+import { useEffect, useRef, useState } from 'react';
 import '../../styles/components/teacher-filter-panel.css';
 
 function TeacherFilterPanel({
-  students = [],
   sections = [],
   teamCodes = [],
   docTypes = [],
   statusOptions = [],
-  selectedStudent,
+  stats = null,
   selectedSection,
   selectedTeamCode,
   selectedDocType,
   selectedStatus = '',
-  onStudentChange,
   onSectionChange,
   onTeamCodeChange,
   onDocTypeChange,
@@ -27,75 +26,53 @@ function TeacherFilterPanel({
         <button type="button" className="btn" onClick={onClear}>Reset Filters</button>
       </div>
 
-      <div className="filter-container">
-        <div className="filter-group">
-          <label htmlFor="student-filter" className="filter-label">
-            Student Name
-          </label>
-          <select
-            id="student-filter"
-            className="filter-select"
-            value={selectedStudent}
-            onChange={(e) => onStudentChange(e.target.value)}
-            aria-describedby="student-help"
-          >
-            <option value="">All Students</option>
-            {students.map((student) => (
-              <option key={student.id || student} value={student}>
-                {student}
-              </option>
-            ))}
-          </select>
-          <span id="student-help" className="sr-only">
-            Filter submissions by student name
-          </span>
+      <div className={`filter-container${!stats ? ' filter-container--compact' : ''}`}>
+        <div className={`filter-dropdowns${!stats ? ' filter-dropdowns--row' : ''}`}>
+          <div className="filter-group">
+            <label className="filter-label">Section</label>
+            <CustomDropdown
+              value={selectedSection}
+              options={sections}
+              placeholder="All Sections"
+              onChange={onSectionChange}
+            />
+          </div>
+
+          <div className="filter-group">
+            <label className="filter-label">Team Code</label>
+            <CustomDropdown
+              value={selectedTeamCode}
+              options={teamCodes}
+              placeholder="All Teams"
+              onChange={onTeamCodeChange}
+            />
+          </div>
         </div>
 
-        <div className="filter-group">
-          <label htmlFor="section-filter" className="filter-label">
-            Section
-          </label>
-          <select
-            id="section-filter"
-            className="filter-select"
-            value={selectedSection}
-            onChange={(e) => onSectionChange(e.target.value)}
-            aria-describedby="section-help"
-          >
-            <option value="">All Sections</option>
-            {sections.map((section) => (
-              <option key={section} value={section}>
-                {section}
-              </option>
-            ))}
-          </select>
-          <span id="section-help" className="sr-only">
-            Filter submissions by section (G01, G02, etc.)
-          </span>
-        </div>
-
-        <div className="filter-group">
-          <label htmlFor="team-filter" className="filter-label">
-            Team Code
-          </label>
-          <select
-            id="team-filter"
-            className="filter-select"
-            value={selectedTeamCode}
-            onChange={(e) => onTeamCodeChange(e.target.value)}
-            aria-describedby="team-help"
-          >
-            <option value="">All Teams</option>
-            {teamCodes.map((code) => (
-              <option key={code} value={code}>
-                {code}
-              </option>
-            ))}
-          </select>
-          <span id="team-help" className="sr-only">
-            Filter submissions by team code
-          </span>
-        </div>
+        {stats && (
+          <div className="filter-stats-row">
+            <div className="filter-stats-item">
+              <span className="filter-stats-label">
+                {stats.studentName ? 'Student' : 'Students'}
+              </span>
+              <span className={`filter-stats-value${stats.studentName ? ' filter-stats-value--name' : ''}`}>
+                {stats.studentName || stats.studentCount}
+              </span>
+            </div>
+            <div className="filter-stats-separator" />
+            <div className="filter-stats-docs">
+              <span className="filter-stats-label">Submissions</span>
+              <div className="filter-stats-docs-grid">
+                {stats.docCounts.map((doc) => (
+                  <div key={doc.type} className="filter-stats-doc">
+                    <span className="filter-stats-doc-type">{doc.type}</span>
+                    <span className="filter-stats-doc-count">{doc.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="filter-divider"></div>
@@ -150,6 +127,62 @@ function TeacherFilterPanel({
         )}
       </div>
     </section>
+  );
+}
+
+function CustomDropdown({ value, options, placeholder, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setIsOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function handleSelect(val) {
+    onChange(val);
+    setIsOpen(false);
+  }
+
+  return (
+    <div className="custom-dropdown" ref={ref}>
+      <button
+        type="button"
+        className={`custom-dropdown__trigger filter-select${isOpen ? ' custom-dropdown__trigger--open' : ''}`}
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+      >
+        <span className="custom-dropdown__text">{value || placeholder}</span>
+        <span className="custom-dropdown__arrow">{isOpen ? '\u25B2' : '\u25BC'}</span>
+      </button>
+      {isOpen && (
+        <ul className="custom-dropdown__list" role="listbox">
+          <li
+            className={`custom-dropdown__item${!value ? ' custom-dropdown__item--active' : ''}`}
+            role="option"
+            aria-selected={!value}
+            onClick={() => handleSelect('')}
+          >
+            {placeholder}
+          </li>
+          {options.map((opt) => (
+            <li
+              key={opt}
+              className={`custom-dropdown__item${value === opt ? ' custom-dropdown__item--active' : ''}`}
+              role="option"
+              aria-selected={value === opt}
+              onClick={() => handleSelect(opt)}
+            >
+              {opt}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

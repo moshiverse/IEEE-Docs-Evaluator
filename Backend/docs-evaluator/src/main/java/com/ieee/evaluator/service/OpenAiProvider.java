@@ -54,7 +54,7 @@ public class OpenAiProvider implements AiProvider {
         Map<String, Object> body = Map.of(
             "model", "gpt-4o-mini",
             "messages", List.of(Map.of("role", "user", "content", prompt)),
-            "max_tokens", 500
+            "max_tokens", 400
         );
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);

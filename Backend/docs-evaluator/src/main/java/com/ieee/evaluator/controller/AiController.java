@@ -65,6 +65,11 @@ public class AiController {
             }
             
             history.setEvaluationResult(newResult);
+
+            if (payload.containsKey("teacherFeedback")) {
+                history.setTeacherFeedback(payload.get("teacherFeedback"));
+            }
+
             historyRepository.save(history);
             
             return ResponseEntity.ok(Map.of("message", "Evaluation updated successfully"));

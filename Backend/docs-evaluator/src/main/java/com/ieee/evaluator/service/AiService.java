@@ -60,6 +60,7 @@ public class AiService {
         history.setEvaluationResult(result);
         history.setEvaluatedAt(LocalDateTime.now());
         history.setIsSent(false);
+        history.setTeacherFeedback(null);
         historyRepository.save(history);
 
         return result;

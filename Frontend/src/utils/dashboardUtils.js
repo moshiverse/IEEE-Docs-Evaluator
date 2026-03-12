@@ -12,7 +12,7 @@ export function getDisplayType(mimeType) {
 
 const DOC_TYPES = ['SRS', 'SDD', 'SPMP', 'STD'];
 
-function normalizeSection(section) {
+export function normalizeSection(section) {
   if (!section) return '';
   const upper = String(section).trim().toUpperCase();
   const goMatch = upper.match(/^GO(\d)$/);
