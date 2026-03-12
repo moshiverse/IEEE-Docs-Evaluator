@@ -102,7 +102,7 @@ function TeacherDashboardPage() {
               students={vm.reportFilterOptions.students}
               sections={vm.reportFilterOptions.sections}
               teamCodes={vm.reportFilterOptions.teamCodes}
-              docTypes={vm.reportDocTypeOptions}
+              docTypes={vm.filterOptions.docTypes}
               selectedStudent={vm.reportSelectedStudent}
               selectedSection={vm.reportSelectedSection}
               selectedTeamCode={vm.reportSelectedTeamCode}
