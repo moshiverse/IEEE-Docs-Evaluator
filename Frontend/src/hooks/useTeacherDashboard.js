@@ -316,7 +316,8 @@ export function useTeacherDashboard(showToast) {
       setAiResult('');
       const data = await analyzeSubmission(selectedFile.id, selectedFile.name, modelName);
       setAiResult(data.analysis || data);
-      if (currentView === 'reports') loadHistory();
+      // Always refresh history so analyzedFileIds updates immediately in submissions view.
+      await loadHistory();
     } catch (err) {
       setAiResult(`Error: ${err.message}`);
     } finally {
