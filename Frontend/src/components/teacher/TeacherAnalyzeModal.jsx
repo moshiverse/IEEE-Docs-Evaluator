@@ -10,7 +10,10 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
         Re-Evaluate (GPT)
       </button>
       <button className="btn btn--gemini" onClick={() => onRun('openrouter')}>
-        Re-Evaluate (Gemini)
+        Re-Evaluate (Gemini - Google AI)
+      </button>
+      <button className="btn btn--gemini-native" onClick={() => onRun('gemini')}>
+        Re-Evaluate (Gemini - Native)
       </button>
     </div>
   ) : null;
@@ -31,7 +34,10 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
               OpenAI (GPT)
             </button>
             <button className="btn btn--gemini" onClick={() => onRun('openrouter')}>
-              Gemini
+              Gemini (Google AI)
+            </button>
+            <button className="btn btn--gemini-native" onClick={() => onRun('gemini')}>
+              Gemini (Native)
             </button>
           </div>
         </div>

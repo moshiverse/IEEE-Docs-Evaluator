@@ -162,6 +162,16 @@
   filter: brightness(1.04);
 }
 
+.btn.btn--gemini-native {
+  background: linear-gradient(140deg, #8b5cf6, #7c3aed);
+  border: none;
+  color: #ffffff;
+}
+
+.btn.btn--gemini-native:hover {
+  filter: brightness(1.04);
+}
+
 /* Analyze Modal - Model Picker */
 .analyze-model-picker {
   text-align: center;
