@@ -91,7 +91,7 @@ public class GeminiProvider implements AiProvider {
                     ))
                 ),
                 "generationConfig", Map.of(
-                    "temperature", 0.3,
+                    "temperature", 0.5,
                     "maxOutputTokens", 800
                 )
             );
