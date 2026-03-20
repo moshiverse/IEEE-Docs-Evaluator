@@ -100,18 +100,8 @@ For deployment, start from `Backend/docs-evaluator/.env.render.example` and map 
 
 1. Create a Render Web Service from this repository.
 2. Use the backend root directory: `Backend/docs-evaluator`.
-3. Build command:
-
-```bash
-./mvnw clean package -DskipTests
-```
-
-4. Start command:
-
-```bash
-java -jar target/docs-evaluator-0.0.1-SNAPSHOT.jar
-```
-
+3. Deploy via Blueprint using `render.yaml` at repo root.
+4. If Render reports `invalid runtime java`, keep using Blueprint and Docker mode (already configured in `render.yaml`).
 5. Configure these environment variables in Render:
   - `SPRING_DATASOURCE_URL`
   - `SPRING_DATASOURCE_USERNAME`

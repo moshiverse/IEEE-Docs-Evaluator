@@ -1,8 +1,7 @@
 services:
   - type: web
     name: ieee-docs-evaluator-backend
-    env: java
+    env: docker
     rootDir: Backend/docs-evaluator
-    buildCommand: ./mvnw clean package -DskipTests
-    startCommand: java -jar target/docs-evaluator-0.0.1-SNAPSHOT.jar
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /api/settings
