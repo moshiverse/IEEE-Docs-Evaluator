@@ -49,16 +49,18 @@ public class AiService {
             return "ERROR: Model provider '" + aiModel + "' is not supported.";
         }
 
-        // 3. Run the analysis
         String result = provider.analyze(extractedText);
-
-        // 4. Save to Supabase
-        EvaluationHistory history = new EvaluationHistory();
+        
+        EvaluationHistory history = historyRepository
+                .findTopByFileIdOrderByEvaluatedAtDesc(fileId)
+                .orElseGet(EvaluationHistory::new);
         history.setFileId(fileId);
         history.setFileName(fileName);
         history.setModelUsed(aiModel);
         history.setEvaluationResult(result);
         history.setEvaluatedAt(LocalDateTime.now());
+        history.setIsSent(false);
+        history.setTeacherFeedback(null);
         historyRepository.save(history);
 
         return result;

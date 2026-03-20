@@ -34,24 +34,104 @@ public class OpenAiProvider implements AiProvider {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(openAiKey);
 
-        String prompt = """
-            You are an IT professor evaluating a Software Requirements Specification (SRS) document based on standard IEEE 830 guidelines.
-            
-            CRITICAL RULE: If the provided text is empty, unreadable, or is NOT a software engineering document, you must state: "ERROR: This document does not appear to be a valid Software Engineering document. No IEEE analysis can be performed."
-            
-            If it is a valid document, provide a professional evaluation with the following structure:
-            ### Summary Evaluation
-            ### Strengths
-            ### Weaknesses
-            ### Conclusion
+        String truncatedContent = text.length() > 8000
+            ? text.substring(0, 8000) + "...[truncated]"
+            : text;
 
-            DOCUMENT CONTENT:
-            """ + text;
+        String prompt = """
+            You are an expert evaluator of software engineering documents following IEEE standards.
+
+            STEP 1 — Identify the document type:
+
+            * SRS (IEEE 830 Software Requirements Specification)
+            * SDD (IEEE 1016 Software Design Description)
+            * SPMP (IEEE 1058 Software Project Management Plan)
+            * STD (IEEE 829 Software Test Documentation)
+
+            If the document is empty, unreadable, or not a software engineering document, reply exactly:
+            ERROR: Invalid Software Engineering document.
+
+            STEP 2 — Evaluate the document using the correct rubric:
+
+            For SRS (IEEE 830), evaluate:
+            * Introduction & Scope
+            * Overall Description
+            * Functional Requirements
+            * Non-Functional Requirements
+            * External Interfaces
+
+            For SDD (IEEE 1016), evaluate:
+            * System Architecture
+            * Data Design
+            * Component Design
+            * Interface Design
+            * Design Decisions
+
+            For SPMP (IEEE 1058), evaluate:
+            * Project Scope & Objectives
+            * Scheduling & Timeline
+            * Resource Allocation
+            * Risk Management
+            * Monitoring & Control
+
+            For STD (IEEE 829), evaluate:
+            * Test Plan
+            * Test Cases
+            * Test Procedures
+            * Test Coverage
+            * Traceability to Requirements
+
+            STEP 3 — Score each criterion from 1 to 5:
+            1 = Poor / Missing
+            2 = Weak
+            3 = Acceptable
+            4 = Good
+            5 = Excellent
+
+            STEP 4 — Provide structured output EXACTLY in this format:
+
+            Document Type: <Detected Type>
+
+            Overall Score: X/25
+
+            Summary:
+            * (2–3 bullet points)
+
+            Rubric Evaluation:
+            * <Criterion 1>: X/5 — (short justification)
+            * <Criterion 2>: X/5 — (short justification)
+            * <Criterion 3>: X/5 — (short justification)
+            * <Criterion 4>: X/5 — (short justification)
+            * <Criterion 5>: X/5 — (short justification)
+
+            Strengths:
+            * (2–3 bullet points)
+
+            Weaknesses:
+            * (2–3 bullet points)
+
+            Missing or Incomplete Sections:
+            * (list specific missing parts, if any)
+
+            Recommendations:
+            * (2–3 actionable improvements)
+
+            Conclusion:
+            * (overall quality judgment)
+
+            IMPORTANT:
+            * Be strict and realistic (like a professor grading a capstone)
+            * Do NOT inflate scores
+            * Base evaluation only on the provided content
+            * Do not hallucinate sections—if a section is missing, mark it as missing
+
+            DOCUMENT:
+            """ + truncatedContent;
 
         Map<String, Object> body = Map.of(
             "model", "gpt-4o-mini",
-            "messages", List.of(Map.of("role", "user", "content", prompt)),
-            "max_tokens", 500
+            "messages", List.of(Map.of("role", "user", "content", prompt))
+            // "max_tokens", 1200
         );
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);

@@ -1,5 +1,5 @@
-import { supabase } from './supabaseClient';
-import './Login.css'; // We will create this file next
+import { supabase } from '../../supabaseClient';
+import '../../styles/pages/login.css';
 
 function Login({ authError }) {
   const handleGoogleLogin = async () => {

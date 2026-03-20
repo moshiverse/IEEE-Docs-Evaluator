@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
 import { verifyStudentWithBackend } from './api'; 
-import Login from './Login';
+import Login from './pages/auth/LoginPage';
 import Home from './Home';
-import TeacherDashboard from './TeacherDashboard';
+import TeacherDashboard from './pages/teacher/TeacherDashboardPage';
+import LoadingScreen from './components/common/LoadingScreen';
 
 function App() {
   const [studentData, setStudentData] = useState(null);
@@ -51,18 +52,10 @@ function App() {
   // Display a loading screen while the backend is checking the Google Sheet/VIP list
   if (isVerifying) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh', 
-        fontFamily: 'sans-serif' 
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <h2>Verifying Credentials...</h2>
-          <p>Syncing with Google Services</p>
-        </div>
-      </div>
+      <LoadingScreen
+        title="Verifying Credentials..."
+        subtitle="Syncing with Google Services"
+      />
     );
   }
 

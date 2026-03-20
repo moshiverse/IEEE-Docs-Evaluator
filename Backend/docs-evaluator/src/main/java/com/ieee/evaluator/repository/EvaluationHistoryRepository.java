@@ -5,10 +5,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface EvaluationHistoryRepository extends JpaRepository<EvaluationHistory, Long> {
     List<EvaluationHistory> findAllByOrderByEvaluatedAtDesc();
-    
+    Optional<EvaluationHistory> findTopByFileIdOrderByEvaluatedAtDesc(String fileId);
     List<EvaluationHistory> findByIsSentTrueAndFileNameContainingIgnoreCaseOrderByEvaluatedAtDesc(String groupCode);
 }

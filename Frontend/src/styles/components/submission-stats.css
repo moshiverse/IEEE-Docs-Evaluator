@@ -1,0 +1,123 @@
+.submission-stats {
+  display: grid;
+  grid-template-columns: auto 1fr 2fr;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+  padding: 0.95rem 1.1rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: var(--bg-surface);
+}
+
+.submission-stats__filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.submission-stats__tag {
+  display: flex;
+  flex-direction: column;
+}
+
+.submission-stats__tag-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.submission-stats__tag-value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.submission-stats__summary {
+  display: flex;
+  justify-content: center;
+}
+
+.submission-stats__count-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.submission-stats__count-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.submission-stats__count-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1.1;
+}
+
+.submission-stats__docs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.submission-stats__docs-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.submission-stats__docs-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+}
+
+.submission-stats__doc-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.55rem 0.3rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--bg-surface-2);
+}
+
+.submission-stats__doc-type {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.submission-stats__doc-count {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+@media (max-width: 768px) {
+  .submission-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .submission-stats__filters {
+    flex-direction: row;
+    gap: 1rem;
+  }
+
+  .submission-stats__docs-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
