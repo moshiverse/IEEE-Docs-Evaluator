@@ -72,11 +72,11 @@ export const updateSystemSetting = async (key, value) => {
     return data;
 };
 
-export const updateEvaluationResult = async (id, newResult, teacherFeedback) => {
+export const updateEvaluationResult = async (id, newResult) => {
     const response = await fetch(`${API_BASE_URL}/ai/history/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ evaluationResult: newResult, teacherFeedback: teacherFeedback || '' })
+        body: JSON.stringify({ evaluationResult: newResult })
     });
     if (!response.ok) throw new Error('Failed to update evaluation.');
     return await response.json();
@@ -97,8 +97,4 @@ export const getStudentReports = async (groupCode) => {
     return await response.json();
 };
 
-export const getClassRoster = async () => {
-    const response = await fetch(`${API_BASE_URL}/roster`);
-    if (!response.ok) throw new Error('Failed to fetch class roster.');
-    return await response.json();
-};
+
