@@ -58,18 +58,100 @@ public class GeminiProvider implements AiProvider {
             : documentContent;
 
         return """
-            Evaluate this IEEE 830 SRS.
+                        You are an expert evaluator of software engineering documents following IEEE standards.
 
-            If empty, unreadable, or not software engineering, reply:
+            STEP 1 — Identify the document type:
+
+            * SRS (IEEE 830 Software Requirements Specification)
+            * SDD (Software Design Description)
+            * SPMP (Software Project Management Plan)
+            * STD (Software Test Documentation)
+
+            If the document is empty, unreadable, or not a software engineering document, reply exactly:
             ERROR: Invalid Software Engineering document.
 
-            Otherwise respond with:
-            Summary
-            Strengths
-            Weaknesses
-            Conclusion
+            STEP 2 — Evaluate the document using the correct rubric:
 
-            2–3 bullet points per section.
+            For SRS (IEEE 830), evaluate:
+
+            * Introduction & Scope
+            * Overall Description
+            * Functional Requirements
+            * Non-Functional Requirements
+            * External Interfaces
+
+            For SDD, evaluate:
+
+            * System Architecture
+            * Data Design
+            * Component Design
+            * Interface Design
+            * Design Decisions
+
+            For SPMP, evaluate:
+
+            * Project Scope & Objectives
+            * Scheduling & Timeline
+            * Resource Allocation
+            * Risk Management
+            * Monitoring & Control
+
+            For STD, evaluate:
+
+            * Test Plan
+            * Test Cases
+            * Test Procedures
+            * Test Coverage
+            * Traceability to Requirements
+
+            STEP 3 — Score each criterion from 1 to 5:
+            1 = Poor / Missing
+            2 = Weak
+            3 = Acceptable
+            4 = Good
+            5 = Excellent
+
+            STEP 4 — Provide structured output EXACTLY in this format:
+
+            Document Type: <Detected Type>
+
+            Summary:
+
+            * (2–3 bullet points)
+
+            Rubric Evaluation:
+
+            * <Criterion 1>: X/5 — (short justification)
+            * <Criterion 2>: X/5 — (short justification)
+            * <Criterion 3>: X/5 — (short justification)
+            * <Criterion 4>: X/5 — (short justification)
+            * <Criterion 5>: X/5 — (short justification)
+
+            Strengths:
+
+            * (2–3 bullet points)
+
+            Weaknesses:
+
+            * (2–3 bullet points)
+
+            Missing or Incomplete Sections:
+
+            * (list specific missing parts, if any)
+
+            Recommendations:
+
+            * (2–3 actionable improvements)
+
+            Conclusion:
+
+            * (overall quality judgment)
+
+            IMPORTANT:
+
+            * Be strict and realistic (like a professor grading a capstone)
+            * Do NOT inflate scores
+            * Base evaluation only on the provided content
 
             DOCUMENT:
             %s
