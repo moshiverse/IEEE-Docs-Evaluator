@@ -97,4 +97,10 @@ export const getStudentReports = async (groupCode) => {
     return await response.json();
 };
 
+export const getClassRoster = async () => {
+    const response = await fetch(`${API_BASE_URL}/roster`);
+    if (!response.ok) throw new Error('Failed to fetch class roster.');
+    return await response.json();
+};
+
 
