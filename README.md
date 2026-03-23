@@ -72,10 +72,12 @@ npm install
 npm run dev
 ```
 
-Create a `.env` file in the `Frontend/` directory:
+Create a `.env.local` file in the `Frontend/` directory:
 
 ```env
-VITE_API_BASE_URL=http://localhost:8080
+VITE_API_BASE_URL=http://localhost:8080/api
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_GOOGLE_CLIENT_ID=your_google_client_id
 ```
 
@@ -91,6 +93,52 @@ mvn spring-boot:run
 ```
 
 For deployment, start from `Backend/docs-evaluator/.env.render.example` and map each key into Render environment variables.
+For local teammate setup, create `Backend/docs-evaluator/src/main/resources/application-secrets.properties` and fill in real values:
+
+```properties
+# Database (Supabase Pooler)
+spring.datasource.url=jdbc:postgresql://<project-host>.pooler.supabase.com:6543/postgres?sslmode=require
+spring.datasource.username=postgres.<project-ref>
+spring.datasource.password=<db-password>
+
+# Google integrations
+app.google.spreadsheet-id=<google-sheet-id>
+# Provide ONE only:
+app.google.service-account-json=
+app.google.service-account-json-base64=<base64-service-account-json>
+
+# Local runtime behavior
+app.cors.allowed-origins=http://localhost:5173
+app.openrouter.http-referer=http://localhost:5173
+app.openrouter.app-title=IEEE Docs Evaluator (Local)
+
+# Optional logging
+spring.jpa.show-sql=false
+```
+
+### Local Teammate Workflow (Safe for Render/Vercel)
+
+This project is deployment-configured, but local development remains fully supported.
+
+1. **Do not edit** deployment files for local secrets.
+2. Put local backend secrets only in:
+  - `Backend/docs-evaluator/src/main/resources/application-secrets.properties` (already git-ignored)
+3. Put local frontend secrets only in:
+  - `Frontend/.env.local` (already git-ignored by `*.local`)
+4. Start services locally:
+
+```bash
+# Terminal 1
+cd Backend/docs-evaluator
+./mvnw spring-boot:run
+
+# Terminal 2
+cd Frontend
+npm install
+npm run dev
+```
+
+This local workflow does not affect Render/Vercel configuration.
 
 ---
 

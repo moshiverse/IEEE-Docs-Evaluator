@@ -51,9 +51,7 @@ public class AiService {
 
         String result = provider.analyze(extractedText);
         
-        EvaluationHistory history = historyRepository
-                .findTopByFileIdOrderByEvaluatedAtDesc(fileId)
-                .orElseGet(EvaluationHistory::new);
+        EvaluationHistory history = new EvaluationHistory();
         history.setFileId(fileId);
         history.setFileName(fileName);
         history.setModelUsed(aiModel);
