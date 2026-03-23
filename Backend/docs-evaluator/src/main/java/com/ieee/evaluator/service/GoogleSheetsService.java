@@ -6,6 +6,7 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.model.ValueRange;
 import com.ieee.evaluator.model.DeliverableConfig;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -20,13 +21,14 @@ import java.util.Map;
 public class GoogleSheetsService {
 
     private final Credential credential;
-    private final String SPREADSHEET_ID = "1q6cmg5f2WjM_6L7cMmWugZTaWYZMbm5i2jV2_hGq3Fc";
+    private final String spreadsheetId;
     
     // Matches the format in your spreadsheet: 3/21/2026 23:59:00
     private static final DateTimeFormatter DEADLINE_FORMATTER = DateTimeFormatter.ofPattern("M/d/yyyy H:mm:ss");
 
-    public GoogleSheetsService(Credential credential) {
+    public GoogleSheetsService(Credential credential, @Value("${app.google.spreadsheet-id:}") String spreadsheetId) {
         this.credential = credential;
+        this.spreadsheetId = spreadsheetId;
     }
 
     /**
@@ -41,10 +43,12 @@ public class GoogleSheetsService {
                 .setApplicationName("IEEE Docs Evaluator")
                 .build();
 
+            ensureSpreadsheetId();
+
         // Reading Columns A (Tag) and B (Deadline)
         String range = "Deliverables_Config!A2:B";
         ValueRange response = service.spreadsheets().values()
-                .get(SPREADSHEET_ID, range)
+            .get(spreadsheetId, range)
                 .execute();
 
         List<List<Object>> values = response.getValues();
@@ -81,10 +85,18 @@ public class GoogleSheetsService {
                 .setApplicationName("IEEE Docs Evaluator")
                 .build();
 
+        ensureSpreadsheetId();
+
         ValueRange response = service.spreadsheets().values()
-                .get(SPREADSHEET_ID, range)
+                .get(spreadsheetId, range)
                 .execute();
 
         return response.getValues();
+    }
+
+    private void ensureSpreadsheetId() {
+        if (spreadsheetId == null || spreadsheetId.isBlank()) {
+            throw new IllegalStateException("Missing GOOGLE_SHEET_ID/app.google.spreadsheet-id configuration.");
+        }
     }
 }

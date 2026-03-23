@@ -51,6 +51,32 @@ public class OpenAiProvider implements AiProvider {
             If the document is empty, unreadable, or not a software engineering document, reply exactly:
             ERROR: Invalid Software Engineering document.
 
+            STEP 1.5 — Always check and extract these document details before evaluation:
+
+            * Is the Document Empty?
+              - Determine if the document is empty, mostly blank, unreadable, or contains placeholder/dummy text such as:
+                "lorem ipsum", repeated filler words, random symbols, or non-meaningful content.
+              - If yes, treat it as invalid and reply exactly:
+                ERROR: Invalid Software Engineering document.
+
+            * Document Type
+              - Explicitly identify the document type based on content.
+
+            * Document Title
+              - Extract the document title if present.
+              - If missing, state: Not specified.
+
+            * Name of Members
+              - Extract the names of members/authors/group members if present.
+              - If missing, state: Not specified.
+
+            * Breakdown per "chapter"
+              - Identify and summarize the document structure by chapter/section headings.
+              - If chapters are not clearly labeled, infer the main sections based on the content.
+              - If no meaningful chapter/section breakdown exists, state: No clear chapter breakdown found.
+
+
+
             STEP 2 — Evaluate the document using the correct rubric:
 
             For SRS (IEEE 830), evaluate:
@@ -90,6 +116,16 @@ public class OpenAiProvider implements AiProvider {
 
             STEP 4 — Provide structured output EXACTLY in this format:
 
+
+            Is the Document Empty?: <Yes/No>
+            Document Title: <Extracted Title or Not specified>
+            Name of Members: <Extracted Names or Not specified>
+            Chapter Breakdown:
+            * <Chapter/Section 1>
+            * <Chapter/Section 2>
+            * <Chapter/Section 3>
+            * <etc.>
+            
             Document Type: <Detected Type>
 
             Overall Score: X/25
@@ -124,6 +160,9 @@ public class OpenAiProvider implements AiProvider {
             * Do NOT inflate scores
             * Base evaluation only on the provided content
             * Do not hallucinate sections—if a section is missing, mark it as missing
+            * Always include the fields: Is the Document Empty?, Document Type, Document Title, Name of Members, and Chapter Breakdown in the output
+            * If title, members, or chapters are missing, explicitly say "Not specified" or "No clear chapter breakdown found"
+            * Treat placeholder-only content (e.g., lorem ipsum) as invalid
 
             DOCUMENT:
             """ + truncatedContent;

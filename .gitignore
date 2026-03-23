@@ -40,6 +40,7 @@ build/
 
 # Ignore Google Service Account Keys Backend
 **/src/main/resources/client_secret.json
+**/src/main/resources/google-service-account.json
 
 # Ignore tokens
 **tokens

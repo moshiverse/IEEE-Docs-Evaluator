@@ -3,6 +3,7 @@ package com.ieee.evaluator.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -20,13 +21,21 @@ public class OpenRouterService implements AiProvider {
     private final DynamicConfigService configService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final String httpReferer;
+    private final String appTitle;
 
     // We can leave the URL and Model hardcoded for now, or move them to the DB later!
     private final String apiUrl = "https://openrouter.ai/api/v1/chat/completions";
     private final String model = "openrouter/free"; 
 
-    public OpenRouterService(DynamicConfigService configService) {
+    public OpenRouterService(
+            DynamicConfigService configService,
+            @Value("${app.openrouter.http-referer:https://localhost}") String httpReferer,
+            @Value("${app.openrouter.app-title:IEEE Docs Evaluator}") String appTitle
+    ) {
         this.configService = configService;
+        this.httpReferer = httpReferer;
+        this.appTitle = appTitle;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(30000); 
         factory.setReadTimeout(60000);    
@@ -159,8 +168,8 @@ public class OpenRouterService implements AiProvider {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(dynamicApiKey); // Uses the dynamic key!
-        headers.set("HTTP-Referer", "http://localhost:8080");
-        headers.set("X-Title", "IEEE Docs Evaluator");
+        headers.set("HTTP-Referer", httpReferer);
+        headers.set("X-Title", appTitle);
 
         try {
             List<Map<String, Object>> contentList = new ArrayList<>();

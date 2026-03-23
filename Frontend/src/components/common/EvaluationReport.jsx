@@ -31,9 +31,9 @@ function renderBody(body)
         {
             list.push(<li key={i}>{renderInline(trimmed.slice(2))}</li>);
         }
-        else if(/^\d+[\.\)]\s/.test(trimmed))
+        else if(/^\d+[.)]\s/.test(trimmed))
         {
-            list.push(<li key={i}>{renderInline(trimmed.replace(/^\d+[\.\)]\s/, ''))}</li>);
+            list.push(<li key={i}>{renderInline(trimmed.replace(/^\d+[.)]\s/, ''))}</li>);
         }
         else if(trimmed === '') 
         {

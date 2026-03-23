@@ -8,10 +8,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/settings")
-@CrossOrigin(origins = "http://localhost:5173") // Crucial for React!
 public class SettingsController {
 
     private final SystemSettingRepository repository;
@@ -23,8 +23,18 @@ public class SettingsController {
     }
 
     @GetMapping
-    public ResponseEntity<List<SystemSetting>> getAllSettings() {
-        return ResponseEntity.ok(repository.findAll());
+    public ResponseEntity<List<SettingResponse>> getAllSettings() {
+        List<SettingResponse> settings = repository.findAll().stream()
+                .map(setting -> new SettingResponse(
+                        setting.getKey(),
+                        maskIfSensitive(setting.getKey(), setting.getValue()),
+                        setting.getCategory(),
+                        setting.getDescription(),
+                        setting.getUpdatedAt()
+                ))
+                .toList();
+
+        return ResponseEntity.ok(settings);
     }
 
     @PostMapping("/update")
@@ -38,4 +48,34 @@ public class SettingsController {
             return ResponseEntity.internalServerError().body(Map.of("error", "Update failed: " + e.getMessage()));
         }
     }
+
+    private String maskIfSensitive(String key, String value) {
+        if (!isSensitiveKey(key) || value == null || value.isBlank()) {
+            return value;
+        }
+
+        return "********";
+    }
+
+    private boolean isSensitiveKey(String key) {
+        if (key == null || key.isBlank()) {
+            return false;
+        }
+
+        String normalized = key.toUpperCase(Locale.ROOT);
+        return normalized.contains("API_KEY")
+                || normalized.contains("SECRET")
+                || normalized.contains("PASSWORD")
+                || normalized.contains("TOKEN")
+                || normalized.contains("PRIVATE_KEY")
+                || normalized.contains("SERVICE_ACCOUNT");
+    }
+
+    private record SettingResponse(
+            String key,
+            String value,
+            String category,
+            String description,
+            java.time.LocalDateTime updatedAt
+    ) {}
 }
