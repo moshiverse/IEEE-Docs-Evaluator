@@ -102,5 +102,3 @@ export const getClassRoster = async () => {
     if (!response.ok) throw new Error('Failed to fetch class roster.');
     return await response.json();
 };
-
-
