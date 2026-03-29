@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from './supabaseClient';
 import { verifyStudentWithBackend } from './api'; 
 import Login from './pages/auth/LoginPage';
@@ -11,45 +11,49 @@ function App() {
   const [authError, setAuthError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
+  // A ref is always current inside the onAuthStateChange closure,
+  // unlike state which gets captured at the time the effect runs.
+  const isVerifiedRef = useRef(false);
+
   useEffect(() => {
-    // Listen for authentication state changes (Sign In / Sign Out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       
       if (event === 'SIGNED_IN' && currentSession) {
+
+        // isVerifiedRef.current is always the latest value — no stale closure.
+        // If already verified, Supabase is just silently refreshing the JWT
+        // on tab focus. Do nothing so the dashboard is never unmounted.
+        if (isVerifiedRef.current) return;
+
         setIsVerifying(true);
         setAuthError('');
         
         try {
-          // 1. Extract Google metadata from Supabase session
           const googleEmail = currentSession.user.email; 
-          
-          // 2. Knock on Spring Boot's door to verify and get the Role Flag
           const data = await verifyStudentWithBackend(googleEmail);
-          
-          // 3. Store the full record (Name, Section, Group, and Role)
+          isVerifiedRef.current = true;  // mark verified before setting state
           setStudentData(data); 
-          
         } catch (error) {
           console.error("Verification failed:", error);
           setAuthError(error.message);
-          
-          // If backend rejects them, sign them out of Supabase immediately
+          isVerifiedRef.current = false;
           await supabase.auth.signOut();
           setStudentData(null);
         } finally {
           setIsVerifying(false);
         }
+
       } else if (event === 'SIGNED_OUT') {
-        // Clean up local state on logout
+        // Reset everything on explicit sign out
+        isVerifiedRef.current = false;
         setStudentData(null);
         setAuthError('');
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, []); // empty dep array is correct — the ref keeps the closure fresh
 
-  // Display a loading screen while the backend is checking the Google Sheet/VIP list
   if (isVerifying) {
     return (
       <LoadingScreen
@@ -59,12 +63,6 @@ function App() {
     );
   }
 
-  /**
-   * ROUTING LOGIC:
-   * 1. If no studentData -> Show Login screen.
-   * 2. If studentData exists AND role is TEACHER -> Show TeacherDashboard.
-   * 3. If studentData exists AND role is STUDENT -> Show Home (Student View).
-   */
   return (
     <div className="app-container">
       {studentData ? (

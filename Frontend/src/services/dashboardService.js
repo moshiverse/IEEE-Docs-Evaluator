@@ -31,8 +31,8 @@ export async function saveSetting(key, value) {
   return updateSystemSetting(key, value);
 }
 
-export async function analyzeSubmission(fileId, fileName, model) {
-  return analyzeDocumentWithAI(fileId, fileName, model);
+export async function analyzeSubmission(fileId, fileName, model, signal) {
+  return analyzeDocumentWithAI(fileId, fileName, model, signal);
 }
 
 export async function saveEvaluation(id, text, teacherFeedback) {

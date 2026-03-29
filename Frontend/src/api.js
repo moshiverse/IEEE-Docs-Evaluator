@@ -32,16 +32,19 @@ export const syncSubmissionsWithBackend = async () => {
 /**
  * AI: Triggers Google Doc text extraction and AI analysis
  */
-export const analyzeDocumentWithAI = async (fileId, fileName, model) => {
+export const analyzeDocumentWithAI = async (fileId, fileName, model, signal) => {
     const response = await fetch(`${API_BASE_URL}/ai/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileId, fileName, model })
+        body: JSON.stringify({ fileId, fileName, model }),
+        keepalive: true,
+        signal,          
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Analysis failed.');
     return data;
 };
+
 
 /**
  * AI: Fetches the evaluation history from Supabase

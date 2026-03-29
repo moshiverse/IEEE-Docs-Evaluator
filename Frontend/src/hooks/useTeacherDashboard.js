@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   analyzeSubmission,
   fetchClassRoster,
@@ -12,7 +12,7 @@ import {
 import { buildFilterOptions, extractSubmissionMeta, filterSubmissions, normalizeSection, sortSubmissions } from '../utils/dashboardUtils';
 
 export function useTeacherDashboard(showToast) {
-  const [currentView, setCurrentView] = useState('submissions'); // change to 'dashboard' later if dashboard page has been created
+  const [currentView, setCurrentView] = useState('submissions');
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -48,6 +48,10 @@ export function useTeacherDashboard(showToast) {
   const [isSavingAll, setIsSavingAll] = useState(false);
 
   const [roster, setRoster] = useState([]);
+
+  // Holds the AbortController for the currently running analysis.
+  // Each new runAnalysis() call creates a fresh one, cancelling any prior run.
+  const analysisAbortRef = useRef(null);
 
   async function loadSubmissions() {
     try {
@@ -100,7 +104,6 @@ export function useTeacherDashboard(showToast) {
     }
     if (currentView === 'reports') loadHistory();
     if (currentView === 'settings') loadSettings();
-    // Fetch roster for any view that needs section/team filters
     if (currentView === 'submissions' || currentView === 'reports') {
       fetchClassRoster().then(setRoster).catch(() => {});
     }
@@ -109,7 +112,6 @@ export function useTeacherDashboard(showToast) {
   const filterOptions = useMemo(() => {
     const base = buildFilterOptions(files);
     if (roster.length > 0) {
-      // Use roster as the source of truth for sections and team codes
       const rosterSections = [...new Set(roster.map((s) => s.section).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       const rosterTeamCodes = [...new Set(roster.map((s) => s.groupCode).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       return { ...base, sections: rosterSections, teamCodes: rosterTeamCodes };
@@ -135,7 +137,6 @@ export function useTeacherDashboard(showToast) {
     const query = searchQuery.trim().toLowerCase();
     const isSearchingStudent = query.length > 0;
 
-    // Scope submissions by section/team filters (normalize both sides for GO1/G01 consistency)
     const scoped = files.filter((item) => {
       const meta = extractSubmissionMeta(item.name);
       if (selectedSection && meta.section !== normalizeSection(selectedSection)) return false;
@@ -143,7 +144,6 @@ export function useTeacherDashboard(showToast) {
       return true;
     });
 
-    // Scope roster by section/team filters (compare raw values since dropdown now uses roster values directly)
     const scopedRoster = roster.filter((s) => {
       if (selectedSection && s.section !== selectedSection) return false;
       if (selectedTeamCode && s.groupCode?.toUpperCase() !== selectedTeamCode.toUpperCase()) return false;
@@ -156,7 +156,6 @@ export function useTeacherDashboard(showToast) {
         return meta.studentName.toLowerCase().includes(query);
       });
 
-      // Also search in roster for the student name
       const rosterMatched = scopedRoster.filter((s) => s.studentName?.toLowerCase().includes(query));
       const matchedNames = [...new Set([
         ...matched.map((f) => extractSubmissionMeta(f.name).studentName),
@@ -175,7 +174,6 @@ export function useTeacherDashboard(showToast) {
       };
     }
 
-    // Use roster count when available, fallback to submission-based count
     const studentCount = scopedRoster.length > 0
       ? scopedRoster.length
       : new Set(scoped.map((item) => extractSubmissionMeta(item.name).studentName).filter(Boolean)).size;
@@ -209,7 +207,6 @@ export function useTeacherDashboard(showToast) {
       if (meta.teamCode) teamCodes.add(meta.teamCode);
     });
 
-    // Use roster as source of truth for sections and team codes when available
     if (roster.length > 0) {
       const rosterSections = [...new Set(roster.map((s) => s.section).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       const rosterTeamCodes = [...new Set(roster.map((s) => s.groupCode).filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -311,17 +308,47 @@ export function useTeacherDashboard(showToast) {
 
   async function runAnalysis(modelName) {
     if (!selectedFile) return;
+
+    // Cancel any previous analysis still in flight
+    if (analysisAbortRef.current) {
+      analysisAbortRef.current.abort();
+    }
+
+    // Fresh controller for this specific run
+    const controller = new AbortController();
+    analysisAbortRef.current = controller;
+
+    const fileToAnalyze = selectedFile;
+
     try {
       setIsAnalyzing(true);
       setAiResult('');
-      const data = await analyzeSubmission(selectedFile.id, selectedFile.name, modelName);
-      setAiResult(data.analysis || data);
-      // Always refresh history so analyzedFileIds updates immediately in submissions view.
-      await loadHistory();
+
+      const data = await analyzeSubmission(
+        fileToAnalyze.id,
+        fileToAnalyze.name,
+        modelName,
+        controller.signal,
+      );
+
+      // If this run was aborted because a newer one started, bail silently
+      if (controller.signal.aborted) return;
+
+      const result = data.analysis || data;
+      setAiResult(result);
+
+      // Refresh history in background — must not block or clear the result
+      loadHistory().catch(() => {});
     } catch (err) {
+      // AbortError = a new analysis was started intentionally, stay silent
+      if (err.name === 'AbortError') return;
       setAiResult(`Error: ${err.message}`);
     } finally {
-      setIsAnalyzing(false);
+      // Only clear the loading flag if this is still the active run
+      if (analysisAbortRef.current === controller) {
+        setIsAnalyzing(false);
+        analysisAbortRef.current = null;
+      }
     }
   }
 
