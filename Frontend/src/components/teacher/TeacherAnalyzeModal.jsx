@@ -15,6 +15,9 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
       <button className="btn btn--gemini-native" onClick={() => onRun('gemini')}>
         Re-Evaluate (Gemini - Native)
       </button>
+      <button className="btn btn--gemini31lite" onClick={() => onRun('gemini-3-flashlite')}>
+        Re-Evaluate (Gemini 3.1 Flash-Lite PDF Vision)
+      </button>
     </div>
   ) : null;
 
@@ -38,6 +41,9 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
             </button>
             <button className="btn btn--gemini-native" onClick={() => onRun('gemini')}>
               Gemini (Native)
+            </button>
+            <button className="btn btn--gemini31lite" onClick={() => onRun('gemini-3-flashlite')}>
+              Gemini 3.1 Flash Lite (PDF Vision)
             </button>
           </div>
         </div>
