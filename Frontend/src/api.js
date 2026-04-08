@@ -37,7 +37,6 @@ export const analyzeDocumentWithAI = async (fileId, fileName, model, signal) => 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileId, fileName, model }),
-        keepalive: true,
         signal,          
     });
     const data = await response.json();
@@ -106,5 +105,25 @@ export const getStudentReports = async (groupCode) => {
 export const getClassRoster = async () => {
     const response = await fetch(`${API_BASE_URL}/roster`);
     if (!response.ok) throw new Error('Failed to fetch class roster.');
+    return await response.json();
+};
+
+export const updateMultipleSystemSettings = async (payload) => {
+    const response = await fetch(`${API_BASE_URL}/settings/update-multiple`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        const validationErrors = Array.isArray(data.errors) ? data.errors.join(' | ') : '';
+        throw new Error(validationErrors || data.error || data.message || 'Failed to update settings.');
+    }
+    return data;
+};
+
+export const getAiRuntimeSettings = async () => {
+    const response = await fetch(`${API_BASE_URL}/settings/ai-runtime`);
+    if (!response.ok) throw new Error('Failed to fetch AI runtime settings.');
     return await response.json();
 };
