@@ -21,7 +21,7 @@ function Login({ authError }) {
           <div className="hero-text-container">
             <h1 className="hero-title">IEEE 1058 Standard Compliant</h1>
             <p className="hero-subtitle">
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+              Evaluate and validate your software project documentation against the IEEE 1058 standard. Get instant compliance feedback and detailed reports.
             </p>
             
             <div className="features-grid">

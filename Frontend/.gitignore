@@ -23,3 +23,35 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Electron Frontend - Node modules
+Frontend/node_modules/
+
+# Electron Frontend - JRE/JDK bundled runtime
+Frontend/resources/jre/
+Frontend/resources/jdk*/
+
+# Electron build output
+Frontend/release/
+Frontend/dist/
+Frontend/out/
+
+# Windows DLL / native binaries
+**/*.dll
+**/*.exe
+!**/src/**/*.exe
+
+# Misc
+.DS_Store
+Thumbs.db
+
+# Electron build artifacts
+release/
+resources/app.jar
+*.exe
+*.asar
+
+*.env.electron
+
+*resources
+
