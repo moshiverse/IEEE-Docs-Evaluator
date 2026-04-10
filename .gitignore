@@ -44,3 +44,4 @@ build/
 
 # Ignore tokens
 **tokens
+/.planning

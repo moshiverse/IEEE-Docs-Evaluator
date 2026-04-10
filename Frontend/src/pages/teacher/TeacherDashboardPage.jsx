@@ -122,6 +122,7 @@ function TeacherDashboardPage() {
               allCount={vm.allHistoryCount}
               loading={vm.loadingHistory}
               onView={vm.startEditingHistory}
+              onDelete={vm.deleteReport}
             />
           </>
         )}
