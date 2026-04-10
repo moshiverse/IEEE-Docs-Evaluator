@@ -21,10 +21,17 @@ const isDev = !app.isPackaged;
 // --- Path resolution ---
 const javaExe = (() => {
   if (isDev) return 'java';
-  const jreBase = path.join(process.resourcesPath, 'jre', 'bin');
+  const jreRoot = path.join(process.resourcesPath, 'jre');
+  // Find the first subdirectory (e.g. jdk-25.0.2+10-jre)
+  const subDir = fs.readdirSync(jreRoot).find(f =>
+    fs.statSync(path.join(jreRoot, f)).isDirectory()
+  );
+  const jreBin = subDir
+    ? path.join(jreRoot, subDir, 'bin')
+    : path.join(jreRoot, 'bin');
   return process.platform === 'win32'
-    ? path.join(jreBase, 'java.exe')
-    : path.join(jreBase, 'java');
+    ? path.join(jreBin, 'java.exe')
+    : path.join(jreBin, 'java');
 })();
 
 const jarPath = isDev
@@ -33,7 +40,7 @@ const jarPath = isDev
 
 const distPath = isDev
   ? path.join(__dirname, '..', 'dist')
-  : path.join(process.resourcesPath, 'dist');
+  : path.join(app.getAppPath(), 'dist');
 
 // --- Splash screen ---
 function createSplashWindow() {

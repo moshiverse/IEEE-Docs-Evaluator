@@ -33,14 +33,12 @@
   "build": {
     "appId": "com.ieee.evaluator",
     "productName": "IEEE Docs Evaluator",
+    "icon": "build/icon.ico",
     "files": [
+      "dist/**/*",
       "electron/**/*"
     ],
     "extraResources": [
-      {
-        "from": "dist",
-        "to": "dist"
-      },
       {
         "from": "../Backend/docs-evaluator/target/docs-evaluator-0.0.1-SNAPSHOT.jar",
         "to": "app.jar"
