@@ -1,6 +1,7 @@
 package com.ieee.evaluator.service;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.ByteArrayContent;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import org.apache.tika.metadata.Metadata;
@@ -13,76 +14,173 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 @Service
-public class GoogleDocsService {
+public class GoogleDocsService 
+{
+    private static final String GOOGLE_DOC_MIME = "application/vnd.google-apps.document";
+    private static final String PDF_MIME = "application/pdf";
+    private static final String DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    private static final String PLAIN_TEXT_MIME = "text/plain";
 
     private final Drive driveService;
 
-    public GoogleDocsService(Drive driveService) {
+    public GoogleDocsService(Drive driveService) 
+    {
         this.driveService = driveService;
     }
 
-    /**
-     * Intelligently downloads and extracts text from Google Docs, Word Docs, and PDFs.
-     */
-    public String exportDocAsText(String fileId) throws Exception {
-        if (fileId == null || fileId.isEmpty()) {
+    public String exportDocAsText(String fileId) throws Exception 
+    {
+        if (fileId == null || fileId.isEmpty()) 
+        {
             throw new IllegalArgumentException("File ID cannot be null or empty");
         }
 
-        try {
-            // 1. BE SMART: Ask Google Drive what kind of file this actually is
+        try 
+        {
             File fileInfo = driveService.files()
                     .get(fileId)
-                    .setFields("name, mimeType")
+                    .setFields("id,name,mimeType")
                     .execute();
 
             String mimeType = fileInfo.getMimeType();
-            System.out.println("DEBUG: Detected file type: " + mimeType + " for " + fileInfo.getName());
 
-            // 2. ROUTE IT: Handle Native Google Docs
-            if (mimeType.equals("application/vnd.google-apps.document")) {
-                try (InputStream is = driveService.files().export(fileId, "text/plain").executeMediaAsInputStream()) {
+            if (GOOGLE_DOC_MIME.equals(mimeType)) 
+            {
+                try (InputStream is = driveService.files().export(fileId, PLAIN_TEXT_MIME).executeMediaAsInputStream()) 
+                {
                     return new String(is.readAllBytes(), StandardCharsets.UTF_8);
                 }
             } 
-            
-            // 3. ROUTE IT: Handle Binary Files (PDF, DOCX, TXT)
-            else if (isSupportedBinary(mimeType)) {
-                // Notice we use .get() instead of .export() here for binary files!
-                try (InputStream is = driveService.files().get(fileId).setAlt("media").executeMediaAsInputStream()) {
+            else if (isSupportedBinaryForTextExtraction(mimeType)) 
+            {
+                try (InputStream is = driveService.files().get(fileId).setAlt("media").executeMediaAsInputStream()) 
+                {
                     return extractTextWithTika(is);
                 }
             } 
-            
-            // 4. GRACEFUL FAILURE: If it's a folder, zip, or image, reject it safely
-            else {
-                throw new Exception("Unsupported file format: " + fileInfo.getName() + " (" + mimeType + "). The evaluator currently supports Google Docs, PDFs, Word Documents, and plain text files.");
+            else 
+            {
+                throw new Exception
+                (
+                        "Unsupported file format: " + fileInfo.getName() + " (" + mimeType + "). " +
+                        "Supported formats are Google Docs, PDF, DOCX, and plain text."
+                );
             }
 
-        } catch (GoogleJsonResponseException e) {
-            // Give the teacher a human-readable error if the student forgot to open link sharing
-            if (e.getStatusCode() == 403 || e.getStatusCode() == 404) {
-                throw new Exception("Permission denied or file not found. Ensure the student set the Google Drive sharing settings to 'Anyone with the link can view'.");
-            }
-            throw e; // Rethrow if it's a different API error
+        } 
+        catch (GoogleJsonResponseException e) 
+        {
+            throw toFriendlyDriveException(e);
         }
     }
 
-    /**
-     * Checks if the file is a supported binary format
-     */
-    private boolean isSupportedBinary(String mimeType) {
-        return mimeType.equals("application/pdf") ||
-               mimeType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document") ||
-               mimeType.equals("text/plain");
+    public byte[] exportDocAsPdfBytesForVision(String fileId) throws Exception 
+    {
+        if (fileId == null || fileId.isEmpty()) 
+        {
+            throw new IllegalArgumentException("File ID cannot be null or empty");
+        }
+
+        try 
+        {
+            File fileInfo = driveService.files()
+                    .get(fileId)
+                    .setFields("id,name,mimeType")
+                    .execute();
+
+            String mimeType = fileInfo.getMimeType();
+
+            if (GOOGLE_DOC_MIME.equals(mimeType)) 
+            {
+                return exportGoogleDocAsPdf(fileId);
+            }
+
+            if (PDF_MIME.equals(mimeType)) 
+            {
+                return downloadBlobBytes(fileId);
+            }
+
+            if (DOCX_MIME.equals(mimeType)) 
+            {
+                return convertDocxToTemporaryGoogleDocAndExportPdf(fileInfo);
+            }
+
+            throw new Exception
+            (
+                    "Unsupported file format for Gemini vision: " + fileInfo.getName() + " (" + mimeType + "). " +
+                    "Supported formats are Google Docs, PDF, and DOCX."
+            );
+
+        } 
+        catch (GoogleJsonResponseException e) 
+        {
+            throw toFriendlyDriveException(e);
+        }
     }
 
-    /**
-     * Uses Apache Tika to magically rip the text out of binary files like PDFs and DOCX
-     */
-    private String extractTextWithTika(InputStream inputStream) throws Exception {
+    private byte[] convertDocxToTemporaryGoogleDocAndExportPdf(File sourceFile) throws Exception 
+    {
+        byte[] docxBytes = downloadBlobBytes(sourceFile.getId());
+        String tempGoogleDocId = null;
+
+        try 
+        {
+            File tempMetadata = new File();
+            tempMetadata.setName(sourceFile.getName() + " [tmp-gemini-conversion]");
+            tempMetadata.setMimeType(GOOGLE_DOC_MIME);
+
+            ByteArrayContent mediaContent = new ByteArrayContent(DOCX_MIME, docxBytes);
+
+            File tempGoogleDoc = driveService.files()
+                    .create(tempMetadata, mediaContent)
+                    .setFields("id,name,mimeType")
+                    .execute();
+
+            tempGoogleDocId = tempGoogleDoc.getId();
+
+            return exportGoogleDocAsPdf(tempGoogleDocId);
+        } 
+        finally 
+        {
+            if (tempGoogleDocId != null) 
+            {
+                try 
+                {
+                    driveService.files().delete(tempGoogleDocId).execute();
+                } 
+                catch (Exception cleanupError) 
+                {
+                    System.err.println("WARN: Failed to delete temporary converted Google Doc: " + cleanupError.getMessage());
+                }
+            }
+        }
+    }
+
+    private byte[] exportGoogleDocAsPdf(String fileId) throws Exception 
+    {
+        try (InputStream is = driveService.files().export(fileId, PDF_MIME).executeMediaAsInputStream()) 
+        {
+            return is.readAllBytes();
+        }
+    }
+
+    private byte[] downloadBlobBytes(String fileId) throws Exception 
+    {
+        try (InputStream is = driveService.files().get(fileId).setAlt("media").executeMediaAsInputStream()) 
+        {
+            return is.readAllBytes();
+        }
+    }
+
+    private boolean isSupportedBinaryForTextExtraction(String mimeType) 
+    {
+        return PDF_MIME.equals(mimeType) || DOCX_MIME.equals(mimeType) || PLAIN_TEXT_MIME.equals(mimeType);
+    }
+
+    private String extractTextWithTika(InputStream inputStream) throws Exception 
+    {
         // -1 disables the character limit so it can read massive documents
-        BodyContentHandler handler = new BodyContentHandler(-1); 
+        BodyContentHandler handler = new BodyContentHandler(-1);
         AutoDetectParser parser = new AutoDetectParser();
         Metadata metadata = new Metadata();
         ParseContext context = new ParseContext();
@@ -90,5 +188,17 @@ public class GoogleDocsService {
         // Tika automatically detects the exact file format and extracts the plain text
         parser.parse(inputStream, handler, metadata, context);
         return handler.toString();
+    }
+
+    private Exception toFriendlyDriveException(GoogleJsonResponseException e) 
+    {
+        if (e.getStatusCode() == 403 || e.getStatusCode() == 404) 
+        {
+            return new Exception
+            (
+                "Permission denied or file not found. Ensure sharing is set to Anyone with the link can view."
+            );
+        }
+        return e;
     }
 }

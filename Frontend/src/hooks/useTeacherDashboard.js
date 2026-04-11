@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   analyzeSubmission,
+  fetchAiRuntimeSettings,
   fetchClassRoster,
   fetchTeacherHistory,
   fetchTeacherSettings,
   fetchTeacherSubmissions,
   saveEvaluation,
+  saveMultipleSettings,
   saveSetting,
   sendEvaluation,
 } from '../services/dashboardService';
@@ -51,12 +53,23 @@ export function useTeacherDashboard(showToast) {
   const [editedSettings, setEditedSettings] = useState({});
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [isSavingAll, setIsSavingAll] = useState(false);
+  const [aiRuntimeSettings, setAiRuntimeSettings] = useState(null);
 
   const [roster, setRoster] = useState([]);
 
   // Holds the AbortController for the currently running analysis.
   // Each new runAnalysis() call creates a fresh one, cancelling any prior run.
   const analysisAbortRef = useRef(null);
+  const selectedFileRef = useRef(null);
+  const isAnalyzeOpenRef = useRef(false);
+
+  useEffect(() => {
+    selectedFileRef.current = selectedFile;
+  }, [selectedFile]);
+
+  useEffect(() => {
+    isAnalyzeOpenRef.current = isAnalyzeOpen;
+  }, [isAnalyzeOpen]);
 
   async function loadSubmissions() {
     try {
@@ -88,13 +101,26 @@ export function useTeacherDashboard(showToast) {
     try {
       setLoadingSettings(true);
       setError('');
-      const data = await fetchTeacherSettings();
-      setSettings(data);
+      const [allSettings, runtimeSettings] = await Promise.all([
+        fetchTeacherSettings(),
+        fetchAiRuntimeSettings(),
+      ]);
+      setSettings(allSettings);
+      setAiRuntimeSettings(runtimeSettings);
       setEditedSettings({});
     } catch (err) {
       setError(`Failed to load settings: ${err.message}`);
     } finally {
       setLoadingSettings(false);
+    }
+  }
+
+  async function loadAiRuntime() {
+    try {
+      const runtimeSettings = await fetchAiRuntimeSettings();
+      setAiRuntimeSettings(runtimeSettings);
+    } catch {
+      // Keep UI usable with fallback options when runtime endpoint fails.
     }
   }
 
@@ -106,6 +132,7 @@ export function useTeacherDashboard(showToast) {
     if (currentView === 'submissions') {
       loadSubmissions();
       loadHistory();
+      loadAiRuntime();
     }
     if (currentView === 'reports') loadHistory();
     if (currentView === 'settings') loadSettings();
@@ -318,18 +345,34 @@ export function useTeacherDashboard(showToast) {
   }
 
   function openAnalyzeModal(file) {
+    if (analysisAbortRef.current && selectedFileRef.current?.id !== file?.id) {
+      analysisAbortRef.current.abort();
+      analysisAbortRef.current = null;
+      setIsAnalyzing(false);
+    }
     setSelectedFile(file);
     setAiResult('');
     setIsAnalyzeOpen(true);
+    loadAiRuntime();
+  }
+
+  function closeAnalyzeModal() {
+    if (analysisAbortRef.current) {
+      analysisAbortRef.current.abort();
+      analysisAbortRef.current = null;
+    }
+
+    setIsAnalyzing(false);
+    setAiResult('');
+    setSelectedFile(null);
+    setIsAnalyzeOpen(false);
   }
 
   async function runAnalysis(modelName) {
     if (!selectedFile) return;
 
-    // Cancel any previous analysis still in flight
-    if (analysisAbortRef.current) {
-      analysisAbortRef.current.abort();
-    }
+    // Do not start another run while one is still in progress.
+    if (analysisAbortRef.current && !analysisAbortRef.current.signal.aborted) return;
 
     // Fresh controller for this specific run
     const controller = new AbortController();
@@ -350,6 +393,9 @@ export function useTeacherDashboard(showToast) {
 
       // If this run was aborted because a newer one started, bail silently
       if (controller.signal.aborted) return;
+
+      // Ignore stale completions if user switched to another file or closed modal.
+      if (!isAnalyzeOpenRef.current || selectedFileRef.current?.id !== fileToAnalyze.id) return;
 
       const result = data.analysis || data;
       setAiResult(result);
@@ -428,6 +474,21 @@ export function useTeacherDashboard(showToast) {
     }
   }
 
+  async function saveAiSettingsBatch(payload) {
+    if (!payload || !Object.keys(payload).length) return;
+
+    try {
+      setIsSavingAll(true);
+      await saveMultipleSettings(payload);
+      showToast('AI settings saved.', 'success');
+      await loadSettings();
+    } catch (err) {
+      showToast(`Failed to save AI settings: ${err.message}`, 'error');
+    } finally {
+      setIsSavingAll(false);
+    }
+  }
+
   return {
     currentView,
     setCurrentView,
@@ -456,11 +517,13 @@ export function useTeacherDashboard(showToast) {
     loadingHistory,
     settings,
     loadingSettings,
+    aiRuntimeSettings,
     editedSettings,
     isSavingAll,
     dirtyCount: Object.keys(editedSettings).length,
     isAnalyzeOpen,
     setIsAnalyzeOpen,
+    closeAnalyzeModal,
     selectedFile,
     aiResult,
     isAnalyzing,
@@ -486,6 +549,7 @@ export function useTeacherDashboard(showToast) {
     sendHistoryToStudent,
     closeHistoryModal,
     handleSettingChange,
+    saveAiSettingsBatch,
     saveAllSettings,
     loadSettings,
     deleteReport,

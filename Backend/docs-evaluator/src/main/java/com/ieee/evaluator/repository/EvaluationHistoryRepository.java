@@ -11,5 +11,6 @@ import java.util.Optional;
 public interface EvaluationHistoryRepository extends JpaRepository<EvaluationHistory, Long> {
     List<EvaluationHistory> findAllByOrderByEvaluatedAtDesc();
     Optional<EvaluationHistory> findTopByFileIdOrderByEvaluatedAtDesc(String fileId);
+    Optional<EvaluationHistory> findTopByFileIdAndModelUsedOrderByEvaluatedAtDesc(String fileId, String modelUsed);
     List<EvaluationHistory> findByIsSentTrueAndFileNameContainingIgnoreCaseOrderByEvaluatedAtDesc(String groupCode);
 }

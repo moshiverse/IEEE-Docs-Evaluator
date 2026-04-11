@@ -2,6 +2,7 @@ package com.ieee.evaluator.config;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import org.springframework.context.annotation.Bean;
@@ -21,10 +22,17 @@ public class GoogleDriveConfig {
 
     @Bean
     public Drive driveService() throws IOException, GeneralSecurityException {
+        HttpRequestInitializer timeoutInitializer = request -> {
+            googleCredential.initialize(request);
+            request.setConnectTimeout(60_000);
+            request.setReadTimeout(300_000);
+        };
+
         return new Drive.Builder(
                 GoogleNetHttpTransport.newTrustedTransport(),
                 GsonFactory.getDefaultInstance(),
-                googleCredential)
+                timeoutInitializer
+        )
                 .setApplicationName("IEEE Docs Evaluator")
                 .build();
     }

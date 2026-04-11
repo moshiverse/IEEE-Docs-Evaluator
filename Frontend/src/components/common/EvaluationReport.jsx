@@ -62,7 +62,7 @@ function parseEvaluationSections(text)
     }
 
     // Heading keyword pattern used throughout
-    const KW = 'Summary|Strengths|Weaknesses|Conclusion';
+    const KW = 'Summary|Rubric Evaluation|Strengths|Weaknesses|Missing or Incomplete Sections|Recommendations|Conclusion';
 
     // Split at any known section heading in all supported formats.
     // The lookahead matches headings that may appear at start-of-string or after \n:
@@ -97,7 +97,15 @@ function parseEvaluationSections(text)
     return sections.length > 0 ? sections : null;
 }
 
-const SECTION_MOD = { Summary: 'summary', Strengths: 'strengths', Weaknesses: 'weaknesses', Conclusion: 'conclusion' };
+const SECTION_MOD = {
+    Summary: 'summary',
+    'Rubric Evaluation': 'rubric',
+    Strengths: 'strengths',
+    Weaknesses: 'weaknesses',
+    'Missing or Incomplete Sections': 'missing',
+    Recommendations: 'recommendations',
+    Conclusion: 'conclusion',
+};
 
 function EvaluationReport({ text }) 
 {
