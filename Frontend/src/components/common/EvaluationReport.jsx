@@ -1,100 +1,100 @@
-function renderInline(text) 
-{
-    return text.split(/(\*\*[^*]+\*\*)/).map((part, i) =>
-    {
+/* eslint-disable react/prop-types */
+import React from 'react';
+
+function renderInline(text) {
+    if (!text) return null;
+    return text.split(/(\*\*[^*]+\*\*)/).map((part, i) => {
         const m = part.match(/^\*\*([^*]+)\*\*$/);
         return m ? <strong key={i}>{m[1]}</strong> : part || null;
     });
 }
 
-function renderBody(body) 
-{
-    if(!body) return null;
-
+function renderBody(body) {
+    if (!body) return null;
     const result = [];
     let list = [];
-
-    const flush = () => 
-    {
-        if(list.length) 
-        {
+    const flush = () => {
+        if (list.length) {
             result.push(<ul key={`ul-${result.length}`} className="eval-card__list">{list}</ul>);
             list = [];
         }
     };
 
-    body.split('\n').forEach((line, i) => 
-    {
+    body.split('\n').forEach((line, i) => {
         const trimmed = line.trim();
-
-        if(trimmed.startsWith('- ') || trimmed.startsWith('* ')) 
-        {
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
             list.push(<li key={i}>{renderInline(trimmed.slice(2))}</li>);
-        }
-        else if(/^\d+[.)]\s/.test(trimmed))
-        {
+        } else if (/^\d+[.)]\s/.test(trimmed)) {
             list.push(<li key={i}>{renderInline(trimmed.replace(/^\d+[.)]\s/, ''))}</li>);
-        }
-        else if(trimmed === '') 
-        {
+        } else if (trimmed === '') {
             flush();
-        } 
-        else 
-        {
+        } else {
             flush();
-            result.push(<p key={i} className="eval-card__note">{renderInline(trimmed)}</p>);
+            if (trimmed.startsWith('**Status**:')) {
+                const statusMatch = trimmed.match(/\*\*Status\*\*:\s*\[?(IMPROVED|WORSENED|SAME)\]?/i);
+                const statusText = statusMatch ? statusMatch[1].toUpperCase() : 'UNKNOWN';
+                result.push(
+                    <div key={i} className="eval-card__status-row">
+                        <strong>Status:</strong>
+                        <span className={`eval-status-badge eval-status-badge--${statusText.toLowerCase()}`}>
+                            {statusText}
+                        </span>
+                    </div>
+                );
+            } 
+            else if (trimmed.includes('/') && !isNaN(trimmed.split('/')[0].trim().split(' ').pop())) {
+                result.push(<div key={i} className="eval-card__large-score">{renderInline(trimmed)}</div>);
+            }
+            else if (trimmed.startsWith('**')) {
+                result.push(<p key={i} className="eval-card__subheading">{renderInline(trimmed)}</p>);
+            } 
+            else {
+                result.push(<p key={i} className="eval-card__note">{renderInline(trimmed)}</p>);
+            }
         }
     });
-
     flush();
     return result;
 }
 
-function parseEvaluationSections(text) 
-{
+function parseEvaluationSections(text) {
     if (!text) return null;
-
-    // Strip enclosing quotation marks added by some AI providers (e.g. OpenRouter)
     let normalized = text.trim();
-    if (normalized.startsWith('"') && normalized.endsWith('"')) 
-    {
-        normalized = normalized.slice(1, -1).trim();
+    if (normalized.startsWith('"') && normalized.endsWith('"')) normalized = normalized.slice(1, -1).trim();
+
+    // Added 'Remaining Issues' and 'Next Steps' to give them their own cards
+    const KW = 'Summary|Rubric Evaluation|Strengths|Weaknesses|Missing Sections|Recommendations|Conclusion|Revision Analysis|Remaining Issues|Next Steps';
+    const splitRe = new RegExp(`(?:^|\\n)(?=\\s*#{1,3}\\s*(?:\\*\\*)?(?:${KW})(?:\\*\\*)?|\\s*\\*\\*(?:${KW}):?\\*\\*|\\s*(?:${KW}):?\\s*(?:\\n|$))`);
+    
+    const firstSectionMatch = normalized.match(splitRe);
+    let headerContent = "";
+    let mainContent = normalized;
+
+    if (firstSectionMatch) {
+        headerContent = normalized.slice(0, firstSectionMatch.index).trim();
+        mainContent = normalized.slice(firstSectionMatch.index).trim();
     }
 
-    // Heading keyword pattern used throughout
-    const KW = 'Summary|Rubric Evaluation|Strengths|Weaknesses|Missing or Incomplete Sections|Recommendations|Conclusion|Revision Analysis';
+    const blocks = mainContent.split(splitRe).filter(b => b.trim());
+    // Fixed Heading Regex to be more aggressive with whitespace
+    const headingRe = new RegExp(`^\\s*(?:#{1,3}\\s*)?\\*?\\*?(${KW}):?\\*?\\*?:?\\s*(.*)`, "i");
 
-    // Split at any known section heading in all supported formats.
-    // The lookahead matches headings that may appear at start-of-string or after \n:
-    //   ### **Summary**   ### Summary   **Summary**   **Summary:**   Summary:   Summary
-    const splitRe = new RegExp(
-        `(?:^|\\n)(?=\\s*#{1,3}\\s*(?:\\*\\*)?(?:${KW})(?:\\*\\*)?|\\s*\\*\\*(?:${KW}):?\\*\\*|\\s*(?:${KW}):?\\s*(?:\\n|$))`,
-    );
-    const blocks = normalized.split(splitRe).filter(b => b.trim());
-
-    // Match heading from the first line of each block
-    const headingRe = new RegExp(
-        `^\\s*(?:#{1,3}\\s*)?\\*\\*(${KW}):?\\*\\*:?\\s*(.*)` +   // **Heading**, **Heading:**, ### **Heading**
-        `|^\\s*(?:#{1,3}\\s+)(${KW}):?\\s*$` +                       // ### Heading, ## Heading
-        `|^\\s*(${KW}):?\\s*$`                                        // Heading, Heading:
-    );
-
-    const sections = blocks.map((block) => 
-    {
-        const nl = block.indexOf('\n');
-        const firstLine = nl === -1 ? block : block.slice(0, nl);
-        const rest = nl === -1 ? '' : block.slice(nl + 1);
+    const sections = blocks.map((block) => {
+        const cleanBlock = block.trim(); // CRITICAL FIX: Trim the block before matching
+        const nl = cleanBlock.indexOf('\n');
+        const firstLine = nl === -1 ? cleanBlock : cleanBlock.slice(0, nl);
+        const rest = nl === -1 ? '' : cleanBlock.slice(nl + 1);
 
         const m = firstLine.match(headingRe);
         if (!m) return null;
-
-        const heading = (m[1] || m[3] || m[4]).trim();
+        
+        const heading = m[1].trim();
         const inlineBody = (m[2] || '').trim();
         const fullBody = [inlineBody, rest.trim()].filter(Boolean).join('\n');
         return { heading, body: fullBody };
     }).filter(Boolean);
 
-    return sections.length > 0 ? sections : null;
+    return { headerContent, sections };
 }
 
 const SECTION_MOD = {
@@ -102,29 +102,33 @@ const SECTION_MOD = {
     'Rubric Evaluation': 'rubric',
     Strengths: 'strengths',
     Weaknesses: 'weaknesses',
-    'Missing or Incomplete Sections': 'missing',
+    'Missing Sections': 'missing',
     Recommendations: 'recommendations',
     Conclusion: 'conclusion',
     'Revision Analysis': 'revision',
+    'Remaining Issues': 'weaknesses', // Reuse weakness styling
+    'Next Steps': 'recommendations'   // Reuse recommendation styling
 };
 
-function EvaluationReport({ text }) 
-{
-    const sections = parseEvaluationSections(text);
-
-    if(!sections) return <div className="report-content">{text}</div>;
+function EvaluationReport({ text }) {
+    const parsed = parseEvaluationSections(text);
+    if (!parsed) return <div className="report-content">{text}</div>;
+    const { headerContent, sections } = parsed;
 
     return (
         <div className="eval-report">
-        {sections.map((section, i) => 
-        (
-            <div key={i} className={`eval-card eval-card--${SECTION_MOD[section.heading] || 'default'}`}>
-            <div className="eval-card__header">
-                <span className="eval-card__heading">{section.heading}</span>
-            </div>
-            <div className="eval-card__body">{renderBody(section.body)}</div>
-            </div>
-        ))}
+            {headerContent && (
+                <div className="eval-card eval-card--metadata">
+                    <div className="eval-card__header"><span className="eval-card__heading">Document Metadata</span></div>
+                    <div className="eval-card__body">{renderBody(headerContent)}</div>
+                </div>
+            )}
+            {sections.map((section, i) => (
+                <div key={i} className={`eval-card eval-card--${SECTION_MOD[section.heading] || 'default'}`}>
+                    <div className="eval-card__header"><span className="eval-card__heading">{section.heading}</span></div>
+                    <div className="eval-card__body">{renderBody(section.body)}</div>
+                </div>
+            ))}
         </div>
     );
 }

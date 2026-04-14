@@ -17,15 +17,6 @@ import java.util.stream.Collectors;
 
 /**
  * Orchestrates AI document analysis.
- *
- * Provider resolution order (for a given request):
- *   1. If the "model" field in the request body is a known provider key → use that provider directly.
- *   2. If model == "auto" or is null/blank → read ACTIVE_AI_PROVIDER from system_settings and route there.
- *
- * This means:
- *   • The frontend can always request a specific provider (e.g. "openai", "gemini", "openrouter").
- *   • If the frontend sends "auto", the active provider from Settings drives the choice.
- *   • All config (API keys, models) is read at request time — zero restart required.
  */
 @Service
 @Slf4j
@@ -41,7 +32,7 @@ public class AiService {
     private static final long   RETRY_BACKOFF_MAX_DELAY_MS = 30_000;
     private static final long   RETRY_TIME_LIMIT_MS       = 180_000;
 
-    private final GoogleDocsService           docsService;
+    private final GoogleDocsService         docsService;
     private final EvaluationHistoryRepository historyRepository;
     private final SystemSettingService        settingsService;
     private final Map<String, AiProvider>     providers;
@@ -67,7 +58,8 @@ public class AiService {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    public String analyzeDocument(String fileId, String fileName, String aiModel) throws Exception {
+    // 1. Add customInstructions here
+    public String analyzeDocument(String fileId, String fileName, String aiModel, String customInstructions) throws Exception {
         AiProvider provider = resolveProvider(aiModel);
         String runKey = buildRunKey(fileId, provider.getProviderName());
 
@@ -77,7 +69,8 @@ public class AiService {
         }
 
         try {
-            String result = analyzeWithRetry(fileId, fileName, provider);
+            // 2. Pass it down to the retry handler
+            String result = analyzeWithRetry(fileId, fileName, provider, customInstructions);
             persistHistory(fileId, fileName, provider.getProviderName(), result);
             return result;
         } finally {
@@ -87,7 +80,8 @@ public class AiService {
 
     // ── Retry logic ───────────────────────────────────────────────────────────
 
-    private String analyzeWithRetry(String fileId, String fileName, AiProvider provider) throws Exception {
+    // 3. Add customInstructions here
+    private String analyzeWithRetry(String fileId, String fileName, AiProvider provider, String customInstructions) throws Exception {
         Exception lastError = null;
         long startedAt = System.currentTimeMillis();
 
@@ -105,7 +99,8 @@ public class AiService {
             }
 
             try {
-                return analyzeOnce(fileId, fileName, provider);
+                // 4. Pass it down to the actual analyzer
+                return analyzeOnce(fileId, fileName, provider, customInstructions);
             } catch (Exception e) {
                 lastError = e;
                 long elapsed = System.currentTimeMillis() - startedAt;
@@ -153,9 +148,11 @@ public class AiService {
         }
     }
 
-    private String analyzeOnce(String fileId, String fileName, AiProvider provider) throws Exception {
+    // 5. Add customInstructions here
+    private String analyzeOnce(String fileId, String fileName, AiProvider provider, String customInstructions) throws Exception {
         if (provider instanceof DriveAwareAiProvider driveAware) {
-            return driveAware.analyzeFromDrive(fileId, fileName);
+            return driveAware.analyzeFromDrive(fileId, fileName); 
+            // Note: If you ever switch back to Gemini from OpenAI, you will need to add customInstructions to DriveAwareAiProvider as well.
         }
 
         GoogleDocsService.DocumentData docData = docsService.extractDocumentContent(fileId, MAX_PAGES_TO_RENDER);
@@ -170,8 +167,8 @@ public class AiService {
                 .map(EvaluationHistory::getEvaluationResult)
                 .orElse(null);
 
-        // Pass the previous evaluation to the provider
-        return provider.analyze(docData.text(), docData.images(), previousEvaluation);
+        // 6. Pass ALL the data to the final interface!
+        return provider.analyze(docData.text(), docData.images(), previousEvaluation, customInstructions);
     }
 
     // ── Provider resolution ───────────────────────────────────────────────────

@@ -32,11 +32,16 @@ export const syncSubmissionsWithBackend = async () => {
 /**
  * AI: Triggers Google Doc text extraction and AI analysis
  */
-export const analyzeDocumentWithAI = async (fileId, fileName, model, signal) => {
+export const analyzeDocumentWithAI = async (fileId, fileName, model, customInstructions, signal) => {
     const response = await fetch(`${API_BASE_URL}/ai/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileId, fileName, model }),
+        body: JSON.stringify({ 
+            fileId, 
+            fileName, 
+            model,
+            customInstructions
+        }),
         signal,          
     });
     const data = await response.json();

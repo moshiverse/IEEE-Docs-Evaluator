@@ -41,8 +41,8 @@ export async function fetchAiRuntimeSettings() {
   return getAiRuntimeSettings();
 }
 
-export async function analyzeSubmission(fileId, fileName, model, signal) {
-  return analyzeDocumentWithAI(fileId, fileName, model, signal);
+export async function analyzeSubmission(fileId, fileName, model, customInstructions, signal) {
+  return analyzeDocumentWithAI(fileId, fileName, model, customInstructions, signal);
 }
 
 export async function saveEvaluation(id, text, teacherFeedback) {

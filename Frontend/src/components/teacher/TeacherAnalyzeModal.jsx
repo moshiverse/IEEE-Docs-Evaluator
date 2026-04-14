@@ -1,9 +1,10 @@
 /* eslint-disable react/prop-types */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import AppModal from '../common/AppModal';
 import EvaluationReport from '../common/EvaluationReport';
 
-function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onRun, aiRuntimeSettings }) {
+function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onRun, aiRuntimeSettings, customRules, setCustomRules }) {
+
   const hasResult = Boolean(aiResult) && !isAnalyzing;
 
   const providerOptions = useMemo(() => {
@@ -40,6 +41,7 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
 
   function handleEvaluate() {
     if (!selectedProvider || !hasProvider) return;
+    // 2. Pass the customRules up to the parent component when clicked
     onRun(selectedProvider.id);
   }
 
@@ -63,13 +65,31 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
       footer={footer}
     >
       {!isAnalyzing && !hasResult && (
-        <p className="muted">Run evaluation to generate an AI report for this submission.</p>
+        <p className="muted" style={{ marginBottom: '1rem' }}>Run evaluation to generate an AI report for this submission.</p>
       )}
 
       {!isAnalyzing && !hasApiKey && (
-        <p className="muted" style={{ marginTop: '0.5rem' }}>
+        <p className="muted" style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
           API key is not configured for this provider. Evaluating now will return an error.
         </p>
+      )}
+
+      {/* --- NEW: Custom Rules Text Box --- */}
+      {!isAnalyzing && (
+        <div className="custom-rules-group">
+          <label htmlFor="custom-rules" className="custom-rules-label">
+            Professor Directives (Optional)
+          </label>
+          <textarea
+            id="custom-rules"
+            className="custom-rules-textarea"
+            placeholder="e.g., Be extremely strict on the Database Schema. Ensure they mention Role-Based Access Control."
+            value={customRules}
+            onChange={(e) => setCustomRules(e.target.value)}
+            disabled={isAnalyzing}
+            rows={hasResult ? 2 : 3} // Makes it slightly smaller if the report is already showing
+          />
+        </div>
       )}
 
       {isAnalyzing && <p className="muted">Extracting text and running analysis...</p>}

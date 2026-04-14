@@ -159,6 +159,8 @@ function TeacherDashboardPage() {
         aiResult={vm.aiResult}
         isAnalyzing={vm.isAnalyzing}
         aiRuntimeSettings={vm.aiRuntimeSettings}
+        customRules={vm.customRules} 
+        setCustomRules={vm.setCustomRules}
         onClose={vm.closeAnalyzeModal}
         onRun={vm.runAnalysis}
       />

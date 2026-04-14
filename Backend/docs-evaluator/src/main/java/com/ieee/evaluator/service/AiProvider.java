@@ -6,15 +6,21 @@ public interface AiProvider {
     // The identifier used by the frontend (e.g., "openai", "gemini")
     String getProviderName(); 
     
-    // The actual logic to send text to the AI and get the result
+    // 1-arg: Base text-only analysis
     String analyze(String text) throws Exception; 
 
-    // Optional multimodal path. Default keeps existing text-only providers working.
+    // 2-arg: Multimodal path
     default String analyze(String documentContent, List<String> base64Images) throws Exception {
         return analyze(documentContent);
     }
-    
+
+    // 3-arg: Revision analysis path
     default String analyze(String documentContent, List<String> base64Images, String previousEvaluation) throws Exception {
         return analyze(documentContent, base64Images);
+    }
+
+    // 4-arg: Custom instructions path (NEWEST)
+    default String analyze(String documentContent, List<String> base64Images, String previousEvaluation, String customInstructions) throws Exception {
+        return analyze(documentContent, base64Images, previousEvaluation);
     }
 }

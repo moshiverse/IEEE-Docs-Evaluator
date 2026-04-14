@@ -27,6 +27,7 @@ export function useTeacherDashboard(showToast) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [isAnalyzeOpen, setIsAnalyzeOpen] = useState(false);
+  const [customRules, setCustomRules] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [aiResult, setAiResult] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -368,6 +369,7 @@ export function useTeacherDashboard(showToast) {
     setIsAnalyzeOpen(false);
   }
 
+  // --- NEW: Added customInstructions to the runAnalysis parameters ---
   async function runAnalysis(modelName) {
     if (!selectedFile) return;
 
@@ -384,10 +386,12 @@ export function useTeacherDashboard(showToast) {
       setIsAnalyzing(true);
       setAiResult('');
 
+      // --- NEW: Pass customInstructions into analyzeSubmission ---
       const data = await analyzeSubmission(
         fileToAnalyze.id,
         fileToAnalyze.name,
         modelName,
+        customRules,
         controller.signal,
       );
 
@@ -493,6 +497,8 @@ export function useTeacherDashboard(showToast) {
     currentView,
     setCurrentView,
     files: sortedFiles,
+    customRules,
+    setCustomRules,
     filterOptions,
     submissionStats,
     selectedStudent,

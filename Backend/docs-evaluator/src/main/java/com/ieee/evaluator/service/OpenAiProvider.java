@@ -19,10 +19,6 @@ import java.util.Map;
  *
  * All configuration (API key, model) is read from the system_settings table
  * at request time via DynamicConfigService — no restart needed after changes.
- *
- * Setting keys consumed:
- *   OPENAI_API_KEY  – secret key, value masked in the Settings UI
- *   OPENAI_MODEL    – e.g. "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"
  */
 @Service
 @Slf4j
@@ -60,17 +56,21 @@ public class OpenAiProvider implements AiProvider {
 
     @Override
     public String analyze(String text) {
-        return analyze(text, List.of(), null);
+        return analyze(text, List.of(), null, null);
     }
 
     @Override
     public String analyze(String text, List<String> base64Images) {
-        // Fix: Override the 2-arg method to pass 'null' as well
-        return analyze(text, base64Images, null);
+        return analyze(text, base64Images, null, null);
     }
 
     @Override
     public String analyze(String text, List<String> base64Images, String previousEvaluation) {
+        return analyze(text, base64Images, previousEvaluation, null);
+    }
+
+    @Override
+    public String analyze(String text, List<String> base64Images, String previousEvaluation, String customInstructions) {
         // Read config fresh on every call — enables zero-restart updates.
         String apiKey = settingsService.getValueOrNull(KEY_API_KEY);
         String model  = settingsService.getValueOrNull(KEY_MODEL);
@@ -84,7 +84,8 @@ public class OpenAiProvider implements AiProvider {
         }
 
         try {
-            return callOpenAi(apiKey.trim(), model.trim(), text, base64Images, previousEvaluation);
+            // FIX 1: Pass customInstructions down into callOpenAi
+            return callOpenAi(apiKey.trim(), model.trim(), text, base64Images, previousEvaluation, customInstructions);
         } catch (HttpClientErrorException e) {
             return handleHttpError(e, "OpenAI");
         } catch (Exception e) {
@@ -95,9 +96,12 @@ public class OpenAiProvider implements AiProvider {
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
-    private String callOpenAi(String apiKey, String model, String documentText, List<String> base64Images, String previousEvaluation)
+    // FIX 2: Update method signature to accept customInstructions
+    private String callOpenAi(String apiKey, String model, String documentText, List<String> base64Images, String previousEvaluation, String customInstructions)
             throws com.fasterxml.jackson.core.JsonProcessingException {
-        String prompt = promptFactory.buildPrompt(documentText, previousEvaluation);
+            
+        // FIX 3: Pass customInstructions to the prompt factory
+        String prompt = promptFactory.buildPrompt(documentText, previousEvaluation, customInstructions);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -134,10 +138,10 @@ public class OpenAiProvider implements AiProvider {
 
         JsonNode root = objectMapper.readTree(response.getBody());
         return root.path("choices")
-                   .get(0)
-                   .path("message")
-                   .path("content")
-                   .asText();
+               .get(0)
+               .path("message")
+               .path("content")
+               .asText();
     }
 
     private String handleHttpError(HttpClientErrorException e, String provider) {

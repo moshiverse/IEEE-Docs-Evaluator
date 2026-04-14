@@ -28,11 +28,15 @@ public class AiController {
             String fileName = payload.get("fileName") == null ? null : payload.get("fileName").trim();
             String model = payload.get("model") == null ? null : payload.get("model").trim();
             
+            // --- NEW: Extract the optional custom instructions from the payload ---
+            String customInstructions = payload.get("customInstructions");
+            
             if (fileId == null || fileId.isBlank() || model == null || model.isBlank() || fileName == null || fileName.isBlank()) {
                 return ResponseEntity.badRequest().body("Missing fileId, fileName, or model");
             }
             
-            String result = aiService.analyzeDocument(fileId, fileName, model);
+            // --- NEW: Pass customInstructions to the AiService ---
+            String result = aiService.analyzeDocument(fileId, fileName, model, customInstructions);
             return ResponseEntity.ok(Map.of("analysis", result));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
