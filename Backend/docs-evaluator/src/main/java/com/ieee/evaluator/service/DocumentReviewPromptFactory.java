@@ -28,7 +28,7 @@ public class DocumentReviewPromptFactory {
         this.stdPromptService = stdPromptService;
     }
 
-    public String buildPrompt(String documentContent) {
+    public String buildPrompt(String documentContent, String previousEvaluation) {
         DocumentType type = detectorService.detect(documentContent);
 
         String rubricSection = switch (type) {
@@ -42,6 +42,6 @@ public class DocumentReviewPromptFactory {
                 """;
         };
 
-        return sharedRulesService.buildPrompt(type, rubricSection, documentContent);
+        return sharedRulesService.buildPrompt(type, rubricSection, documentContent, previousEvaluation);
     }
 }

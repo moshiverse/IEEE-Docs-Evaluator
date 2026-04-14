@@ -165,7 +165,13 @@ public class AiService {
                    "Please ensure the document contains text content.";
         }
 
-        return provider.analyze(docData.text(), docData.images());
+        String previousEvaluation = historyRepository
+                .findTopByFileIdOrderByEvaluatedAtDesc(fileId)
+                .map(EvaluationHistory::getEvaluationResult)
+                .orElse(null);
+
+        // Pass the previous evaluation to the provider
+        return provider.analyze(docData.text(), docData.images(), previousEvaluation);
     }
 
     // ── Provider resolution ───────────────────────────────────────────────────

@@ -316,3 +316,7 @@
   min-height: 140px;
   border-color: color-mix(in srgb, #ec4899 30%, var(--line-soft));
 }
+
+.eval-card--revision .eval-card__header { background: color-mix(in srgb, #0284c7 12%, var(--bg-surface-2)); }
+.eval-card--revision .eval-card__heading { color: #0284c7; }
+[data-theme='dark'] .eval-card--revision .eval-card__heading { color: #38bdf8; }

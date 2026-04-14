@@ -13,4 +13,8 @@ public interface AiProvider {
     default String analyze(String documentContent, List<String> base64Images) throws Exception {
         return analyze(documentContent);
     }
+    
+    default String analyze(String documentContent, List<String> base64Images, String previousEvaluation) throws Exception {
+        return analyze(documentContent, base64Images);
+    }
 }

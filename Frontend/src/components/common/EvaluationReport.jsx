@@ -62,7 +62,7 @@ function parseEvaluationSections(text)
     }
 
     // Heading keyword pattern used throughout
-    const KW = 'Summary|Rubric Evaluation|Strengths|Weaknesses|Missing or Incomplete Sections|Recommendations|Conclusion';
+    const KW = 'Summary|Rubric Evaluation|Strengths|Weaknesses|Missing or Incomplete Sections|Recommendations|Conclusion|Revision Analysis';
 
     // Split at any known section heading in all supported formats.
     // The lookahead matches headings that may appear at start-of-string or after \n:
@@ -105,6 +105,7 @@ const SECTION_MOD = {
     'Missing or Incomplete Sections': 'missing',
     Recommendations: 'recommendations',
     Conclusion: 'conclusion',
+    'Revision Analysis': 'revision',
 };
 
 function EvaluationReport({ text }) 
