@@ -31,21 +31,21 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AiService {
 
-    /** system_settings key that holds the currently active provider name */
-    private static final String KEY_ACTIVE_PROVIDER = "ACTIVE_AI_PROVIDER";
-    private static final String DEFAULT_PROVIDER = "openai";
-    private static final long RECENT_HISTORY_WINDOW_SECONDS = 120;
-    private static final int ANALYZE_MAX_ATTEMPTS = 8;
-    private static final long RETRY_INITIAL_DELAY_MIN_MS = 2_000;
-    private static final long RETRY_INITIAL_DELAY_MAX_MS = 5_000;
-    private static final long RETRY_BACKOFF_MAX_DELAY_MS = 30_000;
-    private static final long RETRY_TIME_LIMIT_MS = 180_000;
+    private static final String KEY_ACTIVE_PROVIDER       = "ACTIVE_AI_PROVIDER";
+    private static final String DEFAULT_PROVIDER          = "openai";
+    private static final int    MAX_PAGES_TO_RENDER       = 10;
+    private static final long   RECENT_HISTORY_WINDOW_SECONDS = 120;
+    private static final int    ANALYZE_MAX_ATTEMPTS      = 8;
+    private static final long   RETRY_INITIAL_DELAY_MIN_MS = 2_000;
+    private static final long   RETRY_INITIAL_DELAY_MAX_MS = 5_000;
+    private static final long   RETRY_BACKOFF_MAX_DELAY_MS = 30_000;
+    private static final long   RETRY_TIME_LIMIT_MS       = 180_000;
 
-    private final GoogleDocsService              docsService;
-    private final EvaluationHistoryRepository    historyRepository;
-    private final SystemSettingService           settingsService;
-    private final Map<String, AiProvider>        providers;      // keyed by providerName().toLowerCase()
-    private final Set<String>                    inFlightAnalyses = ConcurrentHashMap.newKeySet();
+    private final GoogleDocsService           docsService;
+    private final EvaluationHistoryRepository historyRepository;
+    private final SystemSettingService        settingsService;
+    private final Map<String, AiProvider>     providers;
+    private final Set<String>                 inFlightAnalyses = ConcurrentHashMap.newKeySet();
 
     public AiService(
             GoogleDocsService docsService,
@@ -67,14 +67,6 @@ public class AiService {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    /**
-     * Analyse the given Drive file using the requested (or active) AI provider.
-     *
-     * @param fileId    Google Drive file ID
-     * @param fileName  Original file name (for prompt context and history record)
-     * @param aiModel   Provider key from the frontend ("openai", "gemini", "auto", …)
-     * @return Structured evaluation string
-     */
     public String analyzeDocument(String fileId, String fileName, String aiModel) throws Exception {
         AiProvider provider = resolveProvider(aiModel);
         String runKey = buildRunKey(fileId, provider.getProviderName());
@@ -84,17 +76,16 @@ public class AiService {
                 "An evaluation is already in progress for this file and provider. Please wait for it to finish.");
         }
 
-        String result;
-
         try {
-            result = analyzeWithRetry(fileId, fileName, provider);
-
+            String result = analyzeWithRetry(fileId, fileName, provider);
             persistHistory(fileId, fileName, provider.getProviderName(), result);
             return result;
         } finally {
             inFlightAnalyses.remove(runKey);
         }
     }
+
+    // ── Retry logic ───────────────────────────────────────────────────────────
 
     private String analyzeWithRetry(String fileId, String fileName, AiProvider provider) throws Exception {
         Exception lastError = null;
@@ -110,7 +101,6 @@ public class AiService {
                         lastError
                     );
                 }
-
                 sleepBeforeRetry(delayMs);
             }
 
@@ -122,11 +112,7 @@ public class AiService {
 
                 log.warn(
                     "Document evaluation failed for fileId={} provider={} on attempt {}/{}: {}",
-                    fileId,
-                    provider.getProviderName(),
-                    attempt,
-                    ANALYZE_MAX_ATTEMPTS,
-                    e.getMessage()
+                    fileId, provider.getProviderName(), attempt, ANALYZE_MAX_ATTEMPTS, e.getMessage()
                 );
 
                 if (elapsed >= RETRY_TIME_LIMIT_MS) {
@@ -142,14 +128,14 @@ public class AiService {
             }
         }
 
-        throw lastError;
+        throw lastError != null ? lastError
+            : new IllegalStateException("EVALUATION ERROR: All retry attempts exhausted.");
     }
 
     private long computeRetryDelayWithJitterMs(int attempt) {
-        // attempt=2 means first retry, attempt=3 second retry, etc.
         int retryNumber = attempt - 1;
         int growthPower = Math.max(0, retryNumber - 1);
-        growthPower = Math.min(growthPower, 20); // guard against overflow on long-lived loops
+        growthPower = Math.min(growthPower, 20);
 
         long exponentialUpperBound = RETRY_INITIAL_DELAY_MAX_MS * (1L << growthPower);
         long jitterUpperBound = Math.min(exponentialUpperBound, RETRY_BACKOFF_MAX_DELAY_MS);
@@ -169,46 +155,31 @@ public class AiService {
 
     private String analyzeOnce(String fileId, String fileName, AiProvider provider) throws Exception {
         if (provider instanceof DriveAwareAiProvider driveAware) {
-            // PDF-vision path: skip text extraction; send raw bytes to the model.
             return driveAware.analyzeFromDrive(fileId, fileName);
         }
 
-        // Text-extraction path: export doc as plain text then call AI.
-        String extractedText = docsService.exportDocAsText(fileId);
-        List<String> extractedImages = docsService.extractPdfImagesIfPdf(fileId);
+        GoogleDocsService.DocumentData docData = docsService.extractDocumentContent(fileId, MAX_PAGES_TO_RENDER);
 
-        if (extractedText == null || extractedText.isBlank()) {
+        if (docData.text() == null || docData.text().isBlank()) {
             return "EVALUATION ERROR: No readable text found in this document. " +
                    "Please ensure the document contains text content.";
         }
 
-        return provider.analyze(extractedText, extractedImages);
+        return provider.analyze(docData.text(), docData.images());
     }
 
     // ── Provider resolution ───────────────────────────────────────────────────
 
-    /**
-     * Resolve which AiProvider bean handles this request.
-     *
-     * Strategy:
-     *   1. "auto" / blank / null  → read ACTIVE_AI_PROVIDER from DB.
-     *   2. "gpt"                  → legacy alias for "openai".
-     *   3. Any other value        → direct lookup in the providers map.
-     *   4. No match               → fall back to the active DB setting.
-     *   5. Still no match         → fail clearly.
-     */
     private AiProvider resolveProvider(String aiModel) {
         String key = (aiModel == null || aiModel.isBlank() || "auto".equalsIgnoreCase(aiModel))
                      ? activeProviderFromDb()
                      : aiModel.toLowerCase();
 
-        // Legacy alias
         if ("gpt".equals(key)) key = DEFAULT_PROVIDER;
 
         AiProvider provider = providers.get(key);
 
         if (provider == null) {
-            // Try the DB-configured active provider before giving up.
             String activeKey = activeProviderFromDb();
             provider = providers.get(activeKey);
         }
@@ -224,11 +195,6 @@ public class AiService {
         return provider;
     }
 
-    /**
-     * Read the ACTIVE_AI_PROVIDER setting from the DB.
-     * Falls back to "openai" if the key is missing or blank so the system
-     * always has a usable default.
-     */
     private String activeProviderFromDb() {
         try {
             String val = settingsService.getValueOrNull(KEY_ACTIVE_PROVIDER);
@@ -268,7 +234,6 @@ public class AiService {
 
             historyRepository.save(history);
         } catch (Exception e) {
-            // Never let a history-write failure surface to the user.
             log.error("Failed to persist evaluation history for fileId={}: {}", fileId, e.getMessage(), e);
         }
     }
@@ -277,7 +242,6 @@ public class AiService {
         if (evaluatedAt == null || now == null) {
             return false;
         }
-
         long diff = Math.abs(ChronoUnit.SECONDS.between(evaluatedAt, now));
         return diff <= RECENT_HISTORY_WINDOW_SECONDS;
     }
