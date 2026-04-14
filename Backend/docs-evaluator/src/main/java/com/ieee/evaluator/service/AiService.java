@@ -33,7 +33,7 @@ public class AiService {
 
     private static final String KEY_ACTIVE_PROVIDER       = "ACTIVE_AI_PROVIDER";
     private static final String DEFAULT_PROVIDER          = "openai";
-    private static final int    MAX_PAGES_TO_RENDER       = 10;
+    private static final int    MAX_PAGES_TO_RENDER       = 999;
     private static final long   RECENT_HISTORY_WINDOW_SECONDS = 120;
     private static final int    ANALYZE_MAX_ATTEMPTS      = 8;
     private static final long   RETRY_INITIAL_DELAY_MIN_MS = 2_000;

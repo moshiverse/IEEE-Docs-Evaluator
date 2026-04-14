@@ -103,8 +103,7 @@ public class GeminiProvider implements AiProvider {
 
     private String callGemini(String apiKey, String model, String documentText, List<String> base64Images)
             throws com.fasterxml.jackson.core.JsonProcessingException {
-        String truncated = truncate(documentText, 8_000);
-        String prompt    = buildPrompt(truncated);
+        String prompt = buildPrompt(documentText);
         String url       = String.format(API_URL_TEMPLATE, model, apiKey);
 
         HttpHeaders headers = new HttpHeaders();

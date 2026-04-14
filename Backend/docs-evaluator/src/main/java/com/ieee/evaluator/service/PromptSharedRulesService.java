@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 public class PromptSharedRulesService {
 
     public String buildPrompt(DocumentType detectedType, String rubricSection, String documentContent) {
-        String truncatedContent = truncate(documentContent, 20_000);
+        String truncatedContent = documentContent;
 
         return """
             You are an expert evaluator of software engineering documents following IEEE standards.
