@@ -1,6 +1,5 @@
 package com.ieee.evaluator.service;
 
-import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.stereotype.Service;
@@ -29,7 +28,7 @@ public class PdfImageExtractor {
 
         List<String> images = new ArrayList<>();
 
-        try (PDDocument document = Loader.loadPDF(pdfBytes)) {
+        try (PDDocument document = PDDocument.load(pdfBytes)) {
             PDFRenderer renderer = new PDFRenderer(document);
             int pagesToRender = Math.min(Math.max(maxPages, 0), document.getNumberOfPages());
 
