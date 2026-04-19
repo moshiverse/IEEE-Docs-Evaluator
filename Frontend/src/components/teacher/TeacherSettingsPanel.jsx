@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types */
 import { useEffect, useMemo, useState } from 'react';
+import AppModal from '../common/AppModal';
 import './TeacherSettingsPanel.css';
 
 const CATEGORY_ORDER = ['AI', 'GOOGLE', 'MAPPING'];
@@ -56,6 +57,9 @@ export default function TeacherSettingsPanel({
   onSave,
   onSaveMultiple,
   onDiscard,
+  trashBinSummary,
+  onSafeEmptyAllTrashBins,
+  onRestoreSelectedTrashItems,
 }) {
   const dbValue = (key) => settings.find((s) => s.key === key)?.value || '';
 
@@ -80,6 +84,9 @@ export default function TeacherSettingsPanel({
   const [apiKeyEditing, setApiKeyEditing] = useState({ openai: false, gemini: false });
   const [providerDetectionNotice, setProviderDetectionNotice] = useState('');
   const [modelSelections, setModelSelections] = useState({ openai: '', gemini: '' });
+  const [showTrashBin, setShowTrashBin] = useState(false);
+  const [selectedTrashKeys, setSelectedTrashKeys] = useState([]);
+  const [trashDialog, setTrashDialog] = useState(null);
 
   useEffect(() => {
     const fromRuntime = aiRuntimeSettings?.activeProvider;
@@ -115,6 +122,20 @@ export default function TeacherSettingsPanel({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providers, settings]);
+
+  const trashItems = useMemo(() => trashBinSummary?.trashedItems || [], [trashBinSummary]);
+  const trashItemKey = (item) => `${item.kind}:${item.id}`;
+  const selectedTrashItems = useMemo(
+    () => trashItems.filter((item) => selectedTrashKeys.includes(trashItemKey(item))),
+    [trashItems, selectedTrashKeys],
+  );
+  const allTrashSelected = trashItems.length > 0 && selectedTrashItems.length === trashItems.length;
+
+  useEffect(() => {
+    const validKeys = new Set(trashItems.map(trashItemKey));
+    setSelectedTrashKeys((prev) => prev.filter((key) => validKeys.has(key)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trashItems]);
 
   const selectedProvider = providers.find((provider) => provider.id === selectedProviderId) || providers[0];
 
@@ -159,6 +180,44 @@ export default function TeacherSettingsPanel({
   }
   if (isSavingAll) {
     saveAllLabel = 'Saving...';
+  }
+
+  function openTrashDialog(actionType) {
+    setTrashDialog(actionType);
+  }
+
+  function closeTrashDialog() {
+    setTrashDialog(null);
+  }
+
+  function confirmTrashDialog() {
+    if (trashDialog === 'empty') {
+      onSafeEmptyAllTrashBins?.();
+    }
+
+    if (trashDialog === 'restore') {
+      onRestoreSelectedTrashItems?.(selectedTrashItems);
+    }
+
+    closeTrashDialog();
+  }
+
+  function toggleTrashItem(item) {
+    const key = trashItemKey(item);
+    setSelectedTrashKeys((prev) => (
+      prev.includes(key)
+        ? prev.filter((entry) => entry !== key)
+        : [...prev, key]
+    ));
+  }
+
+  function toggleSelectAllTrashItems() {
+    if (allTrashSelected) {
+      setSelectedTrashKeys([]);
+      return;
+    }
+
+    setSelectedTrashKeys(trashItems.map(trashItemKey));
   }
 
   function handleProviderChange(providerId) {
@@ -289,6 +348,116 @@ export default function TeacherSettingsPanel({
           ))}
         </div>
       </section>
+
+      <section className="ssp-card ssp-card--danger-zone">
+        <h3 className="ssp-card__title">Trash Bin Management</h3>
+        <p className="ssp-muted">Select trashed items below to restore them. Empty Trash Bin clears everything currently hidden from the view.</p>
+        <div className="ssp-trash-actions">
+          <button
+            className="ssp-btn ssp-btn--ghost"
+            type="button"
+            onClick={() => setShowTrashBin((prev) => !prev)}
+          >
+            {showTrashBin ? 'Hide Trash' : 'View Trash'}
+          </button>
+          <button
+            className="ssp-btn ssp-btn--ghost"
+            type="button"
+            onClick={() => openTrashDialog('empty')}
+          >
+            Empty Trash
+          </button>
+          <button
+            className="ssp-btn ssp-btn--ghost"
+            type="button"
+            onClick={() => openTrashDialog('restore')}
+            disabled={!selectedTrashItems.length}
+          >
+            Restore
+          </button>
+        </div>
+        {showTrashBin && (
+          <div className="ssp-trash-viewer">
+            <p className="ssp-trash-viewer__summary">
+              Trashed Student Submissions: <strong>{trashBinSummary?.submissionCount || 0}</strong> | Trashed AI Reports: <strong>{trashBinSummary?.reportCount || 0}</strong> | Selected: <strong>{selectedTrashItems.length}</strong>
+            </p>
+
+            <div className="ssp-trash-toolbar">
+              <label className="ssp-trash-select-all">
+                <input
+                  type="checkbox"
+                  checked={allTrashSelected}
+                  onChange={toggleSelectAllTrashItems}
+                  disabled={!trashItems.length}
+                />
+                <span>Select All</span>
+              </label>
+              <span className="ssp-trash-selection-count">
+                {trashItems.length ? `${selectedTrashItems.length} of ${trashItems.length} selected` : 'No trashed items'}
+              </span>
+            </div>
+
+            <div className="ssp-trash-viewer__section ssp-trash-viewer__section--full">
+              <h4 className="ssp-trash-viewer__title">Trash Queue</h4>
+              {trashItems.length ? (
+                <ul className="ssp-trash-viewer__list ssp-trash-viewer__list--queue">
+                  {trashItems.map((item) => {
+                    const key = trashItemKey(item);
+                    return (
+                      <li key={key} className="ssp-trash-viewer__item">
+                        <label className="ssp-trash-viewer__item-select">
+                          <input
+                            type="checkbox"
+                            checked={selectedTrashKeys.includes(key)}
+                            onChange={() => toggleTrashItem(item)}
+                          />
+                          <span className="ssp-trash-viewer__item-label">
+                            <span className="ssp-trash-viewer__item-kind">{item.meta}</span>
+                            {item.label}
+                            {item.date ? <span className="ssp-trash-viewer__item-meta">{item.date}</span> : null}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="ssp-muted">No trashed items to show.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <AppModal
+        isOpen={Boolean(trashDialog)}
+        title={trashDialog === 'empty' ? 'Empty Trash' : 'Restore Selected Items'}
+        subtitle={
+          trashDialog === 'empty'
+            ? 'This will clear all currently trashed items from the trash view.'
+            : `This will restore ${selectedTrashItems.length} selected item(s) from trash.`
+        }
+        onClose={closeTrashDialog}
+        footer={(
+          <div className="ssp-trash-dialog-actions">
+            <button type="button" className="ssp-btn ssp-btn--ghost" onClick={closeTrashDialog}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="ssp-btn ssp-btn--primary"
+              onClick={confirmTrashDialog}
+            >
+              {trashDialog === 'empty' ? 'Empty Trash' : 'Restore'}
+            </button>
+          </div>
+        )}
+      >
+        <p className="ssp-muted">
+          {trashDialog === 'empty' && 'This action will hide all trashed items from the frontend trash bin.'}
+          {trashDialog === 'restore' && 'Only the selected items will be restored.'}
+        </p>
+      </AppModal>
 
       <section className="ssp-card ssp-card--ai">
         <div className="ssp-card__header-row">

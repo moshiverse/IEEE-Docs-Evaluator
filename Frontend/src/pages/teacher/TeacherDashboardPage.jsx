@@ -1,8 +1,10 @@
+import { useMemo, useState } from 'react';
 import PanelHeader from '../../components/common/PanelHeader';
 import ToastMessage from '../../components/common/ToastMessage';
 import TeacherAnalyzeModal from '../../components/teacher/TeacherAnalyzeModal';
 import TeacherFilterPanel from '../../components/teacher/TeacherFilterPanel';
 import TeacherHistoryModal from '../../components/teacher/TeacherHistoryModal';
+import TeacherSubmissionHistoryModal from '../../components/teacher/TeacherSubmissionHistoryModal';
 import TeacherHistoryTable from '../../components/teacher/TeacherHistoryTable';
 import TeacherSettingsPanel from '../../components/teacher/TeacherSettingsPanel';
 import TeacherSidebar from '../../components/teacher/TeacherSidebar';
@@ -17,6 +19,59 @@ function TeacherDashboardPage() {
   const { toast, showToast } = useToast();
   const { themeMode, setThemeMode } = useTheme();
   const vm = useTeacherDashboard(showToast);
+  const [isSubmissionHistoryOpen, setIsSubmissionHistoryOpen] = useState(false);
+  const [submissionHistoryFile, setSubmissionHistoryFile] = useState(null);
+  const [isSubmissionHistoryFlow, setIsSubmissionHistoryFlow] = useState(false);
+
+  const submissionHistoryLogs = useMemo(() => {
+    if (!submissionHistoryFile?.id) return [];
+
+    return vm.historyLogs
+      .filter((log) => log.fileId === submissionHistoryFile.id)
+      .sort((a, b) => new Date(b.evaluatedAt) - new Date(a.evaluatedAt));
+  }, [vm.historyLogs, submissionHistoryFile]);
+
+  function openSubmissionHistoryModal() {
+    if (!vm.selectedFile?.id) return;
+
+    vm.clearReportFilters();
+    vm.closeAnalyzeModal();
+    setSubmissionHistoryFile(vm.selectedFile);
+    setIsSubmissionHistoryOpen(true);
+    setIsSubmissionHistoryFlow(true);
+  }
+
+  function closeSubmissionHistoryModal() {
+    setIsSubmissionHistoryOpen(false);
+    setIsSubmissionHistoryFlow(false);
+    setSubmissionHistoryFile(null);
+  }
+
+  function returnToAnalyzeModal() {
+    if (!submissionHistoryFile) {
+      closeSubmissionHistoryModal();
+      return;
+    }
+
+    setIsSubmissionHistoryOpen(false);
+    vm.openAnalyzeModal(submissionHistoryFile);
+  }
+
+  function viewSubmissionHistoryReport(item) {
+    setIsSubmissionHistoryOpen(false);
+    vm.startEditingHistory(item);
+  }
+
+  function handleHistoryDetailsClose() {
+    vm.closeHistoryModal();
+
+    if (isSubmissionHistoryFlow && submissionHistoryFile?.id) {
+      setIsSubmissionHistoryOpen(true);
+      return;
+    }
+
+    setIsSubmissionHistoryFlow(false);
+  }
 
   return (
     <div className="layout layout--teacher">
@@ -145,6 +200,9 @@ function TeacherDashboardPage() {
               onSettingChange={vm.handleSettingChange}
               onSaveMultiple={vm.saveAiSettingsBatch}
               onSave={vm.saveAllSettings}
+              trashBinSummary={vm.trashBinSummary}
+              onSafeEmptyAllTrashBins={vm.safeEmptyAllTrashBins}
+              onRestoreSelectedTrashItems={vm.restoreSelectedTrashItems}
               onDiscard={() => {
                 vm.loadSettings();
               }}
@@ -158,11 +216,23 @@ function TeacherDashboardPage() {
         file={vm.selectedFile}
         aiResult={vm.aiResult}
         isAnalyzing={vm.isAnalyzing}
+        hasPreviousEvaluation={Boolean(vm.selectedFile?.id && vm.analyzedFileIds?.has(vm.selectedFile.id))}
         aiRuntimeSettings={vm.aiRuntimeSettings}
         customRules={vm.customRules} 
         setCustomRules={vm.setCustomRules}
         onClose={vm.closeAnalyzeModal}
         onRun={vm.runAnalysis}
+        onViewHistory={openSubmissionHistoryModal}
+      />
+
+      <TeacherSubmissionHistoryModal
+        isOpen={isSubmissionHistoryOpen}
+        file={submissionHistoryFile}
+        logs={submissionHistoryLogs}
+        onViewReport={viewSubmissionHistoryReport}
+        onDelete={vm.deleteReport}
+        onClose={closeSubmissionHistoryModal}
+        onReturn={returnToAnalyzeModal}
       />
 
       <TeacherHistoryModal
@@ -179,7 +249,8 @@ function TeacherDashboardPage() {
           navigator.clipboard.writeText(text);
           showToast('Evaluation text copied to clipboard.', 'success');
         }}
-        onClose={vm.closeHistoryModal}
+        onReturn={handleHistoryDetailsClose}
+        onClose={handleHistoryDetailsClose}
       />
     </div>
   );

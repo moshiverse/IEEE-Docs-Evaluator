@@ -45,8 +45,23 @@ export function useTeacherDashboard(showToast) {
   const [reportSelectedSection, setReportSelectedSection] = useState('');
   const [reportSelectedTeamCode, setReportSelectedTeamCode] = useState('');
 
+  const [deletedSubmissionIds, setDeletedSubmissionIds] = useState(() => {
+    const saved = localStorage.getItem('deletedTeacherSubmissionIds');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [permanentDeletedSubmissionIds, setPermanentDeletedSubmissionIds] = useState(() => {
+    const saved = localStorage.getItem('permanentDeletedTeacherSubmissionIds');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [deletedReportIds, setDeletedReportIds] = useState(() => {
     const saved = localStorage.getItem('deletedTeacherReportIds');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [permanentDeletedReportIds, setPermanentDeletedReportIds] = useState(() => {
+    const saved = localStorage.getItem('permanentDeletedTeacherReportIds');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -154,14 +169,30 @@ export function useTeacherDashboard(showToast) {
 
   const filteredFiles = useMemo(
     () =>
-      filterSubmissions(files, {
+      filterSubmissions(
+        files.filter(
+          (item) =>
+            !deletedSubmissionIds.includes(item.id) &&
+            !permanentDeletedSubmissionIds.includes(item.id),
+        ),
+        {
         selectedStudent,
         selectedSection,
         selectedTeamCode,
         selectedDocType,
         searchQuery,
-      }),
-    [files, selectedStudent, selectedSection, selectedTeamCode, selectedDocType, searchQuery],
+        },
+      ),
+    [
+      files,
+      deletedSubmissionIds,
+      permanentDeletedSubmissionIds,
+      selectedStudent,
+      selectedSection,
+      selectedTeamCode,
+      selectedDocType,
+      searchQuery,
+    ],
   );
 
   const sortedFiles = useMemo(() => sortSubmissions(filteredFiles, sortConfig), [filteredFiles, sortConfig]);
@@ -261,7 +292,7 @@ export function useTeacherDashboard(showToast) {
     const query = reportSearchQuery.trim().toLowerCase();
 
     return historyLogs
-      .filter((log) => !deletedReportIds.includes(log.id))
+      .filter((log) => !deletedReportIds.includes(log.id) && !permanentDeletedReportIds.includes(log.id))
       .filter((log) => {
         const docType = extractSubmissionMeta(log.fileName).documentType;
         const meta = extractSubmissionMeta(log.fileName);
@@ -291,6 +322,7 @@ export function useTeacherDashboard(showToast) {
   }, [
     historyLogs,
     deletedReportIds,
+    permanentDeletedReportIds,
     reportSearchQuery,
     reportStatusFilter,
     reportDocTypeFilter,
@@ -299,7 +331,33 @@ export function useTeacherDashboard(showToast) {
     reportSelectedTeamCode,
   ]);
 
-  const allHistoryCount = historyLogs.filter((log) => !deletedReportIds.includes(log.id)).length;
+  const allHistoryCount = historyLogs.filter(
+    (log) => !deletedReportIds.includes(log.id) && !permanentDeletedReportIds.includes(log.id),
+  ).length;
+
+  const trashBinSummary = useMemo(() => {
+    const trashedSubmissions = files
+      .filter((item) => deletedSubmissionIds.includes(item.id))
+      .map((item) => ({ id: item.id, kind: 'submission', label: item.name, meta: 'Student Submission' }));
+
+    const trashedReports = historyLogs
+      .filter((log) => deletedReportIds.includes(log.id))
+      .map((log) => ({ id: log.id, kind: 'report', label: log.fileName, date: log.evaluatedAt, meta: 'AI Report / History' }));
+
+    const trashedItems = [...trashedSubmissions, ...trashedReports].sort((a, b) => {
+      const aTime = a.date ? new Date(a.date).getTime() : 0;
+      const bTime = b.date ? new Date(b.date).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    return {
+      submissionCount: trashedSubmissions.length,
+      reportCount: trashedReports.length,
+      trashedSubmissions,
+      trashedReports,
+      trashedItems,
+    };
+  }, [files, historyLogs, deletedSubmissionIds, deletedReportIds]);
 
   function clearReportFilters() {
     setReportSelectedStudent('');
@@ -314,7 +372,122 @@ export function useTeacherDashboard(showToast) {
     const updated = [...deletedReportIds, reportId];
     setDeletedReportIds(updated);
     localStorage.setItem('deletedTeacherReportIds', JSON.stringify(updated));
-    showToast('Report deleted from view.', 'success');
+    showToast('Report moved to trash.', 'success');
+  }
+
+  function restoreSelectedTrashItems(selectedItems = []) {
+    const items = selectedItems.filter(Boolean);
+    if (!items.length) {
+      showToast('Select one or more trashed items to restore.', 'success');
+      return;
+    }
+
+    const submissionIds = items.filter((item) => item.kind === 'submission').map((item) => item.id);
+    const reportIds = items.filter((item) => item.kind === 'report').map((item) => item.id);
+
+    const nextSubmissionIds = deletedSubmissionIds.filter((id) => !submissionIds.includes(id));
+    const nextReportIds = deletedReportIds.filter((id) => !reportIds.includes(id));
+
+    setDeletedSubmissionIds(nextSubmissionIds);
+    setDeletedReportIds(nextReportIds);
+    localStorage.setItem('deletedTeacherSubmissionIds', JSON.stringify(nextSubmissionIds));
+    localStorage.setItem('deletedTeacherReportIds', JSON.stringify(nextReportIds));
+    showToast(`Restored ${items.length} selected item(s) from trash.`, 'success');
+  }
+
+  function restoreSubmissionFromTrash(submissionId) {
+    if (!deletedSubmissionIds.includes(submissionId)) return;
+
+    const updated = deletedSubmissionIds.filter((id) => id !== submissionId);
+    setDeletedSubmissionIds(updated);
+    localStorage.setItem('deletedTeacherSubmissionIds', JSON.stringify(updated));
+    showToast('Submission restored from trash.', 'success');
+  }
+
+  function restoreReportFromTrash(reportId) {
+    if (!deletedReportIds.includes(reportId)) return;
+
+    const updated = deletedReportIds.filter((id) => id !== reportId);
+    setDeletedReportIds(updated);
+    localStorage.setItem('deletedTeacherReportIds', JSON.stringify(updated));
+    showToast('Report restored from trash.', 'success');
+  }
+
+  function restoreTrashItem(kind, itemId) {
+    if (kind === 'submission') {
+      restoreSubmissionFromTrash(itemId);
+      return;
+    }
+
+    if (kind === 'report') {
+      restoreReportFromTrash(itemId);
+    }
+  }
+
+  function safeEmptyAllTrashBins() {
+    const hasTrash = deletedSubmissionIds.length > 0 || deletedReportIds.length > 0;
+    if (!hasTrash) {
+      showToast('Trash bins are already empty.', 'success');
+      return;
+    }
+
+    const removedSubmissionCount = deletedSubmissionIds.length;
+    const removedReportCount = deletedReportIds.length;
+
+    setDeletedSubmissionIds([]);
+    setDeletedReportIds([]);
+    localStorage.setItem('deletedTeacherSubmissionIds', JSON.stringify([]));
+    localStorage.setItem('deletedTeacherReportIds', JSON.stringify([]));
+    showToast(
+      `Trash cleared from the frontend: ${removedSubmissionCount} submission(s), ${removedReportCount} report(s).`,
+      'success',
+    );
+  }
+
+  function restoreAllFilesFromTrash() {
+    const hasTrash = deletedSubmissionIds.length > 0 || deletedReportIds.length > 0;
+    if (!hasTrash) {
+      showToast('No trashed items to restore.', 'success');
+      return;
+    }
+
+    setDeletedSubmissionIds([]);
+    setDeletedReportIds([]);
+    localStorage.setItem('deletedTeacherSubmissionIds', JSON.stringify([]));
+    localStorage.setItem('deletedTeacherReportIds', JSON.stringify([]));
+    showToast('All trashed files restored.', 'success');
+  }
+
+  function deleteAllRecordsPermanently() {
+    const hasAnyData = files.length > 0 || historyLogs.length > 0 || deletedSubmissionIds.length > 0 || deletedReportIds.length > 0;
+    if (!hasAnyData) {
+      showToast('No records available to delete permanently.', 'success');
+      return;
+    }
+
+    const allSubmissionIds = [...new Set([
+      ...permanentDeletedSubmissionIds,
+      ...deletedSubmissionIds,
+      ...files.map((item) => item.id).filter(Boolean),
+    ])];
+
+    const allReportIds = [...new Set([
+      ...permanentDeletedReportIds,
+      ...deletedReportIds,
+      ...historyLogs.map((log) => log.id).filter(Boolean),
+    ])];
+
+    setPermanentDeletedSubmissionIds(allSubmissionIds);
+    setPermanentDeletedReportIds(allReportIds);
+    localStorage.setItem('permanentDeletedTeacherSubmissionIds', JSON.stringify(allSubmissionIds));
+    localStorage.setItem('permanentDeletedTeacherReportIds', JSON.stringify(allReportIds));
+
+    setDeletedSubmissionIds([]);
+    setDeletedReportIds([]);
+    localStorage.setItem('deletedTeacherSubmissionIds', JSON.stringify([]));
+    localStorage.setItem('deletedTeacherReportIds', JSON.stringify([]));
+
+    showToast('All records permanently deleted from this device view.', 'success');
   }
 
   async function handleManualSync() {
@@ -353,6 +526,7 @@ export function useTeacherDashboard(showToast) {
     }
     setSelectedFile(file);
     setAiResult('');
+    setCustomRules('');
     setIsAnalyzeOpen(true);
     loadAiRuntime();
   }
@@ -365,6 +539,7 @@ export function useTeacherDashboard(showToast) {
 
     setIsAnalyzing(false);
     setAiResult('');
+    setCustomRules('');
     setSelectedFile(null);
     setIsAnalyzeOpen(false);
   }
@@ -381,17 +556,19 @@ export function useTeacherDashboard(showToast) {
     analysisAbortRef.current = controller;
 
     const fileToAnalyze = selectedFile;
+    const customInstructions = customRules;
 
     try {
       setIsAnalyzing(true);
       setAiResult('');
+      setCustomRules('');
 
       // --- NEW: Pass customInstructions into analyzeSubmission ---
       const data = await analyzeSubmission(
         fileToAnalyze.id,
         fileToAnalyze.name,
         modelName,
-        customRules,
+        customInstructions,
         controller.signal,
       );
 
@@ -567,6 +744,10 @@ export function useTeacherDashboard(showToast) {
     saveAllSettings,
     loadSettings,
     deleteReport,
+    restoreSelectedTrashItems,
+    safeEmptyAllTrashBins,
+    trashBinSummary,
     deletedReportIds,
+    deletedSubmissionIds,
   };
 }

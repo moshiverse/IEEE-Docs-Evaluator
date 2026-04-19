@@ -12,6 +12,7 @@ function TeacherHistoryModal({
   onSave,
   onSend,
   onCopy,
+  onReturn,
   onClose,
 }) {
   const footer = isEditing ? (
@@ -21,8 +22,9 @@ function TeacherHistoryModal({
     </div>
   ) : (
     <div className="modal-actions modal-actions--end">
-      <button className="btn" onClick={() => onEditToggle(true)}>Edit</button>
       <button className="btn" onClick={() => onCopy(item?.evaluationResult || '')}>Copy Text</button>
+      <button className="btn" onClick={() => onEditToggle(true)}>Edit</button>
+      <button className="btn btn--secondary" onClick={onReturn}>Return</button>
       <button className="btn btn--primary" onClick={onSend} disabled={item?.isSent}>
         {item?.isSent ? 'Sent to Student' : 'Send Result'}
       </button>
@@ -37,6 +39,7 @@ function TeacherHistoryModal({
       onClose={onClose}
       title="Saved Evaluation Report"
       subtitle={item ? `File: ${item.fileName}` : ''}
+      containerClassName="submission-history-modal"
       footer={footer}
     >
       {isEditing ? (

@@ -1,11 +1,11 @@
 import '../../styles/components/modal.css';
 
-function AppModal({ isOpen, title, subtitle, onClose, children, footer }) {
+function AppModal({ isOpen, title, subtitle, onClose, children, footer, containerClassName = '' }) {
   if (!isOpen) return null;
 
   return (
     <div className="app-modal__overlay" onClick={onClose}>
-      <div className="app-modal__container" onClick={(e) => e.stopPropagation()}>
+      <div className={`app-modal__container ${containerClassName}`.trim()} onClick={(e) => e.stopPropagation()}>
         <header className="app-modal__header">
           <div>
             <h2 className="app-modal__title">{title}</h2>

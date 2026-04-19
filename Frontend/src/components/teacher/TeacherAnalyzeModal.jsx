@@ -1,11 +1,12 @@
 /* eslint-disable react/prop-types */
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import AppModal from '../common/AppModal';
 import EvaluationReport from '../common/EvaluationReport';
 
-function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onRun, aiRuntimeSettings, customRules, setCustomRules }) {
+function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onRun, aiRuntimeSettings, customRules, setCustomRules, onViewHistory, hasPreviousEvaluation = false }) {
 
   const hasResult = Boolean(aiResult) && !isAnalyzing;
+  const hasHistory = Boolean(hasPreviousEvaluation);
 
   const providerOptions = useMemo(() => {
     if (aiRuntimeSettings?.providers?.length) {
@@ -49,6 +50,11 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
   const footer = isAnalyzing ? null : (
     <div className="analyze-modal-footer">
       <div className="modal-actions modal-actions--end">
+        {hasHistory && (
+          <button className="btn btn--secondary" onClick={onViewHistory} disabled={isAnalyzing}>
+            View History
+          </button>
+        )}
         <button className="btn btn--primary" onClick={handleEvaluate} disabled={!hasProvider || isAnalyzing}>
           {actionLabel}
         </button>
@@ -92,7 +98,16 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
         </div>
       )}
 
-      {isAnalyzing && <p className="muted">Extracting text and running analysis...</p>}
+      {isAnalyzing && (
+        <div className="analyze-loading" role="status" aria-live="polite">
+          <div className="analyze-loading__spinner" aria-hidden="true">
+            <span className="analyze-loading__ring" />
+            <span className="analyze-loading__ring analyze-loading__ring--delay" />
+          </div>
+          <p className="analyze-loading__title">Running AI evaluation...</p>
+          <p className="analyze-loading__subtitle">Extracting text and generating analysis for this submission.</p>
+        </div>
+      )}
       {hasResult && <EvaluationReport text={aiResult}/>}
     </AppModal>
   );

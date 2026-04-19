@@ -21,6 +21,15 @@
   overflow: hidden;
 }
 
+.app-modal__container.submission-history-modal {
+  width: min(980px, 100%);
+}
+
+.submission-history-modal .app-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
 .app-modal__header {
   display: flex;
   justify-content: space-between;
@@ -140,6 +149,97 @@
 
 .modal-actions--end {
   justify-content: flex-end;
+}
+
+.btn.btn--return-history {
+  background: linear-gradient(140deg, #0f766e, #0ea5a4);
+  border: none;
+  color: #ffffff;
+}
+
+.btn.btn--return-history:hover {
+  filter: brightness(1.04);
+}
+
+.submission-history-modal__footer-actions .btn.btn--return-history {
+  margin-right: auto;
+}
+
+.submission-history-modal__footer-actions {
+  gap: 0.5rem;
+}
+
+.submission-history-modal__row-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.submission-history-modal__row-actions .btn {
+  white-space: nowrap;
+}
+
+.submission-history-modal .app-table th:nth-child(3) {
+  text-align: left;
+}
+
+.submission-history-modal .app-table td:nth-child(3) {
+  text-align: left;
+}
+
+.submission-history-modal__table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.submission-history-modal__table th:nth-child(1),
+.submission-history-modal__table td:nth-child(1) {
+  width: 170px;
+}
+
+.submission-history-modal__table th:nth-child(2),
+.submission-history-modal__table td:nth-child(2) {
+  width: auto;
+}
+
+.submission-history-modal__table th:nth-child(3),
+.submission-history-modal__table td:nth-child(3) {
+  width: 150px;
+}
+
+.submission-history-modal__table th:nth-child(4),
+.submission-history-modal__table td:nth-child(4) {
+  width: 300px;
+}
+
+.submission-history-modal__table th:nth-child(4) {
+  text-align: left;
+}
+
+.submission-history-modal__table td:nth-child(4) {
+  text-align: left;
+}
+
+@media (max-width: 840px) {
+  .app-modal__container.submission-history-modal {
+    width: min(100%, 980px);
+  }
+
+  .submission-history-modal__row-actions {
+    flex-wrap: wrap;
+  }
+
+  .submission-history-modal__table {
+    table-layout: auto;
+  }
+
+  .submission-history-modal__table th:nth-child(3),
+  .submission-history-modal__table td:nth-child(3),
+  .submission-history-modal__table th:nth-child(4),
+  .submission-history-modal__table td:nth-child(4) {
+    width: auto;
+  }
 }
 
 .btn.btn--openai {
@@ -401,9 +501,9 @@
   box-sizing: border-box;
   padding: 0.85rem;
   border-radius: 8px;
-  border: 1px solid #cbd5e1; /* Soft border */
-  background-color: #f8fafc; /* Very light gray background */
-  color: #0f172a; /* Dark text */
+  border: 1px solid var(--line-soft);
+  background-color: var(--bg-surface-2);
+  color: var(--text-main);
   font-family: inherit;
   font-size: 0.95rem;
   line-height: 1.5;
@@ -412,14 +512,14 @@
 }
 
 .custom-rules-textarea::placeholder {
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .custom-rules-textarea:focus {
   outline: none;
-  border-color: #0284c7; /* Brand Blue */
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15); /* Soft blue glow */
-  background-color: #ffffff;
+  border-color: color-mix(in srgb, var(--brand) 55%, var(--line-soft));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--glow) 38%, transparent);
+  background-color: var(--bg-surface);
 }
 
 .custom-rules-textarea:disabled {
@@ -429,13 +529,57 @@
 
 /* --- Dark Mode Support (if your app uses data-theme='dark') --- */
 [data-theme='dark'] .custom-rules-label {
-  color: #94a3b8;
+  color: var(--text-muted);
 }
-[data-theme='dark'] .custom-rules-textarea {
-  background-color: #1e293b;
-  border-color: #334155;
-  color: #f8fafc;
+
+.analyze-loading {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 0.45rem;
+  padding: 1.1rem 0.6rem 0.3rem;
 }
-[data-theme='dark'] .custom-rules-textarea:focus {
-  background-color: #0f172a;
+
+.analyze-loading__spinner {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 0.25rem;
+  position: relative;
+}
+
+.analyze-loading__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: #7ec4ff;
+  border-left-color: #39a0ff;
+  animation: analyzeLoadingSpin 0.9s linear infinite;
+}
+
+.analyze-loading__ring--delay {
+  inset: 8px;
+  border-top-color: #9bf2cc;
+  border-left-color: #00a36f;
+  animation-duration: 1.2s;
+  animation-direction: reverse;
+}
+
+.analyze-loading__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.analyze-loading__subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+@keyframes analyzeLoadingSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
