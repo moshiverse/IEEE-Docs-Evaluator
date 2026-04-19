@@ -203,7 +203,6 @@ function TeacherDashboardPage() {
               trashBinSummary={vm.trashBinSummary}
               onSafeEmptyAllTrashBins={vm.safeEmptyAllTrashBins}
               onRestoreSelectedTrashItems={vm.restoreSelectedTrashItems}
-              onDeleteSelectedTrashItemsPermanently={vm.deleteSelectedTrashItemsPermanently}
               onDiscard={() => {
                 vm.loadSettings();
               }}

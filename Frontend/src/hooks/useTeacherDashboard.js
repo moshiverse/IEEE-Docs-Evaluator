@@ -444,35 +444,6 @@ export function useTeacherDashboard(showToast) {
     );
   }
 
-  function deleteSelectedTrashItemsPermanently(selectedItems = []) {
-    const items = selectedItems.filter(Boolean);
-    if (!items.length) {
-      showToast('Select one or more trashed items to delete permanently.', 'success');
-      return;
-    }
-
-    const submissionIds = items.filter((item) => item.kind === 'submission').map((item) => item.id);
-    const reportIds = items.filter((item) => item.kind === 'report').map((item) => item.id);
-
-    const nextPermanentSubmissionIds = [...new Set([...permanentDeletedSubmissionIds, ...submissionIds])];
-    const nextPermanentReportIds = [...new Set([...permanentDeletedReportIds, ...reportIds])];
-
-    const nextDeletedSubmissionIds = deletedSubmissionIds.filter((id) => !submissionIds.includes(id));
-    const nextDeletedReportIds = deletedReportIds.filter((id) => !reportIds.includes(id));
-
-    setPermanentDeletedSubmissionIds(nextPermanentSubmissionIds);
-    setPermanentDeletedReportIds(nextPermanentReportIds);
-    localStorage.setItem('permanentDeletedTeacherSubmissionIds', JSON.stringify(nextPermanentSubmissionIds));
-    localStorage.setItem('permanentDeletedTeacherReportIds', JSON.stringify(nextPermanentReportIds));
-
-    setDeletedSubmissionIds(nextDeletedSubmissionIds);
-    setDeletedReportIds(nextDeletedReportIds);
-    localStorage.setItem('deletedTeacherSubmissionIds', JSON.stringify(nextDeletedSubmissionIds));
-    localStorage.setItem('deletedTeacherReportIds', JSON.stringify(nextDeletedReportIds));
-
-    showToast(`Permanently deleted ${items.length} selected item(s).`, 'success');
-  }
-
   function restoreAllFilesFromTrash() {
     const hasTrash = deletedSubmissionIds.length > 0 || deletedReportIds.length > 0;
     if (!hasTrash) {
@@ -775,7 +746,6 @@ export function useTeacherDashboard(showToast) {
     deleteReport,
     restoreSelectedTrashItems,
     safeEmptyAllTrashBins,
-    deleteSelectedTrashItemsPermanently,
     trashBinSummary,
     deletedReportIds,
     deletedSubmissionIds,

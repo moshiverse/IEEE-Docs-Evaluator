@@ -60,7 +60,6 @@ export default function TeacherSettingsPanel({
   trashBinSummary,
   onSafeEmptyAllTrashBins,
   onRestoreSelectedTrashItems,
-  onDeleteSelectedTrashItemsPermanently,
 }) {
   const dbValue = (key) => settings.find((s) => s.key === key)?.value || '';
 
@@ -198,10 +197,6 @@ export default function TeacherSettingsPanel({
 
     if (trashDialog === 'restore') {
       onRestoreSelectedTrashItems?.(selectedTrashItems);
-    }
-
-    if (trashDialog === 'delete') {
-      onDeleteSelectedTrashItemsPermanently?.(selectedTrashItems);
     }
 
     closeTrashDialog();
@@ -356,7 +351,7 @@ export default function TeacherSettingsPanel({
 
       <section className="ssp-card ssp-card--danger-zone">
         <h3 className="ssp-card__title">Trash Bin Management</h3>
-        <p className="ssp-muted">Select trashed items below to restore or delete them permanently. Empty Trash Bin clears everything currently hidden from the view.</p>
+        <p className="ssp-muted">Select trashed items below to restore them. Empty Trash Bin clears everything currently hidden from the view.</p>
         <div className="ssp-trash-actions">
           <button
             className="ssp-btn ssp-btn--ghost"
@@ -379,14 +374,6 @@ export default function TeacherSettingsPanel({
             disabled={!selectedTrashItems.length}
           >
             Restore
-          </button>
-          <button
-            className="ssp-btn ssp-btn--danger-strong"
-            type="button"
-            onClick={() => openTrashDialog('delete')}
-            disabled={!selectedTrashItems.length}
-          >
-            Delete Permanently
           </button>
         </div>
         {showTrashBin && (
@@ -440,20 +427,15 @@ export default function TeacherSettingsPanel({
             </div>
           </div>
         )}
-        <p className="ssp-warning" style={{ marginTop: '0.6rem' }}>
-          Warning: Delete All Permanently cannot be restored.
-        </p>
       </section>
 
       <AppModal
         isOpen={Boolean(trashDialog)}
-        title={trashDialog === 'empty' ? 'Empty Trash' : trashDialog === 'restore' ? 'Restore Selected Items' : 'Delete Permanently'}
+        title={trashDialog === 'empty' ? 'Empty Trash' : 'Restore Selected Items'}
         subtitle={
           trashDialog === 'empty'
             ? 'This will clear all currently trashed items from the trash view.'
-            : trashDialog === 'restore'
-              ? `This will restore ${selectedTrashItems.length} selected item(s) from trash.`
-              : `This will permanently delete ${selectedTrashItems.length} selected item(s).`
+            : `This will restore ${selectedTrashItems.length} selected item(s) from trash.`
         }
         onClose={closeTrashDialog}
         footer={(
@@ -463,10 +445,10 @@ export default function TeacherSettingsPanel({
             </button>
             <button
               type="button"
-              className={trashDialog === 'delete' ? 'ssp-btn ssp-btn--danger-strong' : 'ssp-btn ssp-btn--primary'}
+              className="ssp-btn ssp-btn--primary"
               onClick={confirmTrashDialog}
             >
-              {trashDialog === 'empty' ? 'Empty Trash' : trashDialog === 'restore' ? 'Restore' : 'Delete Permanently'}
+              {trashDialog === 'empty' ? 'Empty Trash' : 'Restore'}
             </button>
           </div>
         )}
@@ -474,7 +456,6 @@ export default function TeacherSettingsPanel({
         <p className="ssp-muted">
           {trashDialog === 'empty' && 'This action will hide all trashed items from the frontend trash bin.'}
           {trashDialog === 'restore' && 'Only the selected items will be restored.'}
-          {trashDialog === 'delete' && 'This action cannot be undone.'}
         </p>
       </AppModal>
 
