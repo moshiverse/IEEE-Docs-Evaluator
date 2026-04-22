@@ -4,127 +4,124 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.ByteArrayContent;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.sax.BodyContentHandler;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Service
-public class GoogleDocsService 
-{
+@Slf4j
+public class GoogleDocsService {
     private static final String GOOGLE_DOC_MIME = "application/vnd.google-apps.document";
     private static final String PDF_MIME = "application/pdf";
     private static final String DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     private static final String PLAIN_TEXT_MIME = "text/plain";
 
     private final Drive driveService;
+    private final PdfImageExtractor pdfImageExtractor;
 
-    public GoogleDocsService(Drive driveService) 
-    {
+    public GoogleDocsService(Drive driveService, PdfImageExtractor pdfImageExtractor) {
         this.driveService = driveService;
+        this.pdfImageExtractor = pdfImageExtractor;
     }
 
-    public String exportDocAsText(String fileId) throws Exception 
-    {
-        if (fileId == null || fileId.isEmpty()) 
-        {
+    public record DocumentData(String text, List<String> images) {}
+
+    public DocumentData extractDocumentContent(String fileId, int maxPages) throws Exception {
+        if (fileId == null || fileId.isEmpty()) {
             throw new IllegalArgumentException("File ID cannot be null or empty");
         }
 
-        try 
-        {
-            File fileInfo = driveService.files()
-                    .get(fileId)
-                    .setFields("id,name,mimeType")
-                    .execute();
-
+        try {
+            File fileInfo = driveService.files().get(fileId).setFields("id,name,mimeType").execute();
             String mimeType = fileInfo.getMimeType();
 
-            if (GOOGLE_DOC_MIME.equals(mimeType)) 
-            {
-                try (InputStream is = driveService.files().export(fileId, PLAIN_TEXT_MIME).executeMediaAsInputStream()) 
-                {
-                    return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            String text;
+            List<String> images = List.of();
+
+            if (GOOGLE_DOC_MIME.equals(mimeType)) {
+                // Native plain text export is more accurate for Google Docs
+                try (InputStream is = driveService.files().export(fileId, PLAIN_TEXT_MIME).executeMediaAsInputStream()) {
+                    text = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                 }
-            } 
-            else if (isSupportedBinaryForTextExtraction(mimeType)) 
-            {
-                try (InputStream is = driveService.files().get(fileId).setAlt("media").executeMediaAsInputStream()) 
-                {
-                    return extractTextWithTika(is);
-                }
-            } 
-            else 
-            {
-                throw new Exception
-                (
-                        "Unsupported file format: " + fileInfo.getName() + " (" + mimeType + "). " +
-                        "Supported formats are Google Docs, PDF, DOCX, and plain text."
+                // Separate PDF export for image extraction
+                byte[] pdfBytes = exportGoogleDocAsPdf(fileId);
+                images = pdfImageExtractor.extractFirstPagesAsBase64Pngs(pdfBytes, maxPages);
+            }
+            else if (PDF_MIME.equals(mimeType)) {
+                // Single download, reuse bytes for both text and images
+                byte[] pdfBytes = downloadBlobBytes(fileId);
+                text = extractTextWithTika(new ByteArrayInputStream(pdfBytes));
+                images = pdfImageExtractor.extractFirstPagesAsBase64Pngs(pdfBytes, maxPages);
+            }
+            else if (DOCX_MIME.equals(mimeType)) {
+                // Single download, reuse bytes for both text and PDF conversion
+                byte[] docxBytes = downloadBlobBytes(fileId);
+                text = extractTextWithTika(new ByteArrayInputStream(docxBytes));
+                byte[] pdfBytes = convertDocxToTemporaryGoogleDocAndExportPdf(fileInfo, docxBytes);
+                images = pdfImageExtractor.extractFirstPagesAsBase64Pngs(pdfBytes, maxPages);
+            }
+            else if (PLAIN_TEXT_MIME.equals(mimeType)) {
+                byte[] textBytes = downloadBlobBytes(fileId);
+                text = new String(textBytes, StandardCharsets.UTF_8);
+            }
+            else {
+                throw new Exception(
+                    "Unsupported file format: " + fileInfo.getName() + " (" + mimeType + "). " +
+                    "Supported formats are Google Docs, PDF, DOCX, and plain text."
                 );
             }
 
-        } 
-        catch (GoogleJsonResponseException e) 
-        {
+            return new DocumentData(text, images);
+
+        } catch (GoogleJsonResponseException e) {
             throw toFriendlyDriveException(e);
         }
     }
 
-    public byte[] exportDocAsPdfBytesForVision(String fileId) throws Exception 
-    {
-        if (fileId == null || fileId.isEmpty()) 
-        {
+    public byte[] exportDocAsPdfBytesForVision(String fileId) throws Exception {
+        if (fileId == null || fileId.isEmpty()) {
             throw new IllegalArgumentException("File ID cannot be null or empty");
         }
 
-        try 
-        {
-            File fileInfo = driveService.files()
-                    .get(fileId)
-                    .setFields("id,name,mimeType")
-                    .execute();
-
+        try {
+            File fileInfo = driveService.files().get(fileId).setFields("id,name,mimeType").execute();
             String mimeType = fileInfo.getMimeType();
 
-            if (GOOGLE_DOC_MIME.equals(mimeType)) 
-            {
+            if (GOOGLE_DOC_MIME.equals(mimeType)) {
                 return exportGoogleDocAsPdf(fileId);
             }
 
-            if (PDF_MIME.equals(mimeType)) 
-            {
+            if (PDF_MIME.equals(mimeType)) {
                 return downloadBlobBytes(fileId);
             }
 
-            if (DOCX_MIME.equals(mimeType)) 
-            {
-                return convertDocxToTemporaryGoogleDocAndExportPdf(fileInfo);
+            if (DOCX_MIME.equals(mimeType)) {
+                byte[] docxBytes = downloadBlobBytes(fileId);
+                return convertDocxToTemporaryGoogleDocAndExportPdf(fileInfo, docxBytes);
             }
 
-            throw new Exception
-            (
-                    "Unsupported file format for Gemini vision: " + fileInfo.getName() + " (" + mimeType + "). " +
-                    "Supported formats are Google Docs, PDF, and DOCX."
+            throw new Exception(
+                "Unsupported file format for Gemini vision: " + fileInfo.getName() + " (" + mimeType + "). " +
+                "Supported formats are Google Docs, PDF, and DOCX."
             );
 
-        } 
-        catch (GoogleJsonResponseException e) 
-        {
+        } catch (GoogleJsonResponseException e) {
             throw toFriendlyDriveException(e);
         }
     }
 
-    private byte[] convertDocxToTemporaryGoogleDocAndExportPdf(File sourceFile) throws Exception 
-    {
-        byte[] docxBytes = downloadBlobBytes(sourceFile.getId());
+    private byte[] convertDocxToTemporaryGoogleDocAndExportPdf(File sourceFile, byte[] docxBytes) throws Exception {
         String tempGoogleDocId = null;
 
-        try 
-        {
+        try {
             File tempMetadata = new File();
             tempMetadata.setName(sourceFile.getName() + " [tmp-gemini-conversion]");
             tempMetadata.setMimeType(GOOGLE_DOC_MIME);
@@ -137,65 +134,43 @@ public class GoogleDocsService
                     .execute();
 
             tempGoogleDocId = tempGoogleDoc.getId();
-
             return exportGoogleDocAsPdf(tempGoogleDocId);
-        } 
-        finally 
-        {
-            if (tempGoogleDocId != null) 
-            {
-                try 
-                {
+        } finally {
+            if (tempGoogleDocId != null) {
+                try {
                     driveService.files().delete(tempGoogleDocId).execute();
-                } 
-                catch (Exception cleanupError) 
-                {
-                    System.err.println("WARN: Failed to delete temporary converted Google Doc: " + cleanupError.getMessage());
+                } catch (Exception cleanupError) {
+                    log.warn("Failed to delete temporary converted Google Doc: {}", cleanupError.getMessage());
                 }
             }
         }
     }
 
-    private byte[] exportGoogleDocAsPdf(String fileId) throws Exception 
-    {
-        try (InputStream is = driveService.files().export(fileId, PDF_MIME).executeMediaAsInputStream()) 
-        {
+    private byte[] exportGoogleDocAsPdf(String fileId) throws Exception {
+        try (InputStream is = driveService.files().export(fileId, PDF_MIME).executeMediaAsInputStream()) {
             return is.readAllBytes();
         }
     }
 
-    private byte[] downloadBlobBytes(String fileId) throws Exception 
-    {
-        try (InputStream is = driveService.files().get(fileId).setAlt("media").executeMediaAsInputStream()) 
-        {
+    private byte[] downloadBlobBytes(String fileId) throws Exception {
+        try (InputStream is = driveService.files().get(fileId).setAlt("media").executeMediaAsInputStream()) {
             return is.readAllBytes();
         }
     }
 
-    private boolean isSupportedBinaryForTextExtraction(String mimeType) 
-    {
-        return PDF_MIME.equals(mimeType) || DOCX_MIME.equals(mimeType) || PLAIN_TEXT_MIME.equals(mimeType);
-    }
-
-    private String extractTextWithTika(InputStream inputStream) throws Exception 
-    {
-        // -1 disables the character limit so it can read massive documents
+    private String extractTextWithTika(InputStream inputStream) throws Exception {
         BodyContentHandler handler = new BodyContentHandler(-1);
         AutoDetectParser parser = new AutoDetectParser();
         Metadata metadata = new Metadata();
         ParseContext context = new ParseContext();
 
-        // Tika automatically detects the exact file format and extracts the plain text
         parser.parse(inputStream, handler, metadata, context);
         return handler.toString();
     }
 
-    private Exception toFriendlyDriveException(GoogleJsonResponseException e) 
-    {
-        if (e.getStatusCode() == 403 || e.getStatusCode() == 404) 
-        {
-            return new Exception
-            (
+    private Exception toFriendlyDriveException(GoogleJsonResponseException e) {
+        if (e.getStatusCode() == 403 || e.getStatusCode() == 404) {
+            return new Exception(
                 "Permission denied or file not found. Ensure sharing is set to Anyone with the link can view."
             );
         }

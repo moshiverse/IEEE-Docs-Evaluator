@@ -4,8 +4,10 @@ import {
   getEvaluationHistory,
   getStudentReports,
   getSystemSettings,
+  getAiRuntimeSettings,
   sendEvaluationToStudent,
   syncSubmissionsWithBackend,
+  updateMultipleSystemSettings,
   updateEvaluationResult,
   updateSystemSetting,
 } from '../api';
@@ -31,8 +33,16 @@ export async function saveSetting(key, value) {
   return updateSystemSetting(key, value);
 }
 
-export async function analyzeSubmission(fileId, fileName, model, signal) {
-  return analyzeDocumentWithAI(fileId, fileName, model, signal);
+export async function saveMultipleSettings(payload) {
+  return updateMultipleSystemSettings(payload);
+}
+
+export async function fetchAiRuntimeSettings() {
+  return getAiRuntimeSettings();
+}
+
+export async function analyzeSubmission(fileId, fileName, model, customInstructions, signal) {
+  return analyzeDocumentWithAI(fileId, fileName, model, customInstructions, signal);
 }
 
 export async function saveEvaluation(id, text, teacherFeedback) {

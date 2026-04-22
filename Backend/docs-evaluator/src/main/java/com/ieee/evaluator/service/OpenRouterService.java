@@ -50,6 +50,11 @@ public class OpenRouterService implements AiProvider {
 
     @Override
     public String analyze(String documentContent) throws Exception {
+        return analyze(documentContent, List.of());
+    }
+
+    @Override
+    public String analyze(String documentContent, List<String> base64Images) throws Exception {
         // DYNAMIC: Fetch the OpenRouter API key straight from Supabase!
         String apiKey = configService.getValue("OPENROUTER_API_KEY");
 
@@ -59,7 +64,7 @@ public class OpenRouterService implements AiProvider {
 
         try {
             String prompt = buildAnalysisPrompt(documentContent);
-            return callOpenRouterAPI(prompt, apiKey);
+            return callOpenRouterAPI(prompt, base64Images, apiKey);
         } catch (Exception e) {
             log.error("AI analysis failed: {}", e.getMessage(), e);
             return "SYSTEM ERROR: AI analysis failed. " + e.getMessage();
@@ -164,7 +169,7 @@ public class OpenRouterService implements AiProvider {
             """.formatted(truncatedContent);
     }
 
-    private String callOpenRouterAPI(String prompt, String dynamicApiKey) {
+    private String callOpenRouterAPI(String prompt, List<String> base64Images, String dynamicApiKey) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(dynamicApiKey); // Uses the dynamic key!
@@ -177,6 +182,18 @@ public class OpenRouterService implements AiProvider {
             textContent.put("type", "text");
             textContent.put("text", prompt);
             contentList.add(textContent);
+
+            if (base64Images != null) {
+                for (String image : base64Images) {
+                    if (image == null || image.isBlank()) {
+                        continue;
+                    }
+                    Map<String, Object> imageContent = new HashMap<>();
+                    imageContent.put("type", "image_url");
+                    imageContent.put("image_url", Map.of("url", "data:image/png;base64," + image));
+                    contentList.add(imageContent);
+                }
+            }
 
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("model", model);

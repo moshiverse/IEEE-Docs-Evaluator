@@ -122,6 +122,7 @@ function TeacherDashboardPage() {
               allCount={vm.allHistoryCount}
               loading={vm.loadingHistory}
               onView={vm.startEditingHistory}
+              onDelete={vm.deleteReport}
             />
           </>
         )}
@@ -134,6 +135,7 @@ function TeacherDashboardPage() {
             />
             <TeacherSettingsPanel
               settings={vm.settings}
+              aiRuntimeSettings={vm.aiRuntimeSettings}
               editedSettings={vm.editedSettings}
               loading={vm.loadingSettings}
               dirtyCount={vm.dirtyCount}
@@ -141,6 +143,7 @@ function TeacherDashboardPage() {
               themeMode={themeMode}
               onThemeModeChange={setThemeMode}
               onSettingChange={vm.handleSettingChange}
+              onSaveMultiple={vm.saveAiSettingsBatch}
               onSave={vm.saveAllSettings}
               onDiscard={() => {
                 vm.loadSettings();
@@ -155,7 +158,10 @@ function TeacherDashboardPage() {
         file={vm.selectedFile}
         aiResult={vm.aiResult}
         isAnalyzing={vm.isAnalyzing}
-        onClose={() => vm.setIsAnalyzeOpen(false)}
+        aiRuntimeSettings={vm.aiRuntimeSettings}
+        customRules={vm.customRules} 
+        setCustomRules={vm.setCustomRules}
+        onClose={vm.closeAnalyzeModal}
         onRun={vm.runAnalysis}
       />
 

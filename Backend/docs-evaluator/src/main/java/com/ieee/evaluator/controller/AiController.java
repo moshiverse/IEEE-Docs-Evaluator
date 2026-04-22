@@ -24,16 +24,23 @@ public class AiController {
     @PostMapping("/analyze")
     public ResponseEntity<?> analyzeFile(@RequestBody Map<String, String> payload) {
         try {
-            String fileId = payload.get("fileId");
-            String fileName = payload.get("fileName");
-            String model = payload.get("model");
+            String fileId = payload.get("fileId") == null ? null : payload.get("fileId").trim();
+            String fileName = payload.get("fileName") == null ? null : payload.get("fileName").trim();
+            String model = payload.get("model") == null ? null : payload.get("model").trim();
             
-            if (fileId == null || model == null || fileName == null) {
+            // --- NEW: Extract the optional custom instructions from the payload ---
+            String customInstructions = payload.get("customInstructions");
+            
+            if (fileId == null || fileId.isBlank() || model == null || model.isBlank() || fileName == null || fileName.isBlank()) {
                 return ResponseEntity.badRequest().body("Missing fileId, fileName, or model");
             }
             
-            String result = aiService.analyzeDocument(fileId, fileName, model);
+            // --- NEW: Pass customInstructions to the AiService ---
+            String result = aiService.analyzeDocument(fileId, fileName, model, customInstructions);
             return ResponseEntity.ok(Map.of("analysis", result));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

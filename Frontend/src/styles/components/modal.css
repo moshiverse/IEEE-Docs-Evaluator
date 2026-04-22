@@ -316,3 +316,126 @@
   min-height: 140px;
   border-color: color-mix(in srgb, #ec4899 30%, var(--line-soft));
 }
+
+.eval-card--revision .eval-card__header { background: color-mix(in srgb, #0284c7 12%, var(--bg-surface-2)); }
+.eval-card--revision .eval-card__heading { color: #0284c7; }
+[data-theme='dark'] .eval-card--revision .eval-card__heading { color: #38bdf8; }
+
+/* --- New Subheading Styles --- */
+.eval-card__subheading {
+  margin: 1.2rem 0 0.4rem 0;
+  color: var(--text-main);
+  font-size: 0.95rem;
+  font-style: normal; /* Overrides the italic from the note class */
+  line-height: 1.4;
+}
+
+.eval-card__subheading:first-child {
+  margin-top: 0.2rem;
+}
+
+/* --- Status Badge Styles --- */
+.eval-card__status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.5rem 0 1.2rem 0;
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+
+.eval-status-badge {
+  padding: 0.2rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.eval-status-badge--improved {
+  background: color-mix(in srgb, #22c55e 15%, transparent);
+  color: #16a34a;
+  border: 1px solid color-mix(in srgb, #22c55e 30%, transparent);
+}
+
+.eval-status-badge--worsened {
+  background: color-mix(in srgb, #ef4444 15%, transparent);
+  color: #dc2626;
+  border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
+}
+
+.eval-status-badge--same {
+  background: color-mix(in srgb, #64748b 15%, transparent);
+  color: #475569;
+  border: 1px solid color-mix(in srgb, #64748b 30%, transparent);
+}
+
+/* Dark mode support for the badges */
+[data-theme='dark'] .eval-status-badge--improved { color: #4ade80; }
+[data-theme='dark'] .eval-status-badge--worsened { color: #f87171; }
+[data-theme='dark'] .eval-status-badge--same { color: #94a3b8; }
+
+/* --- Custom Rules Input Styles --- */
+.custom-rules-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%; /* Forces it to span the full modal width */
+  margin-top: 1rem;
+  margin-bottom: 1.5rem;
+  text-align: left; /* Fixes the weird centering */
+}
+
+.custom-rules-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b; /* Safe muted text color */
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+}
+
+.custom-rules-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1; /* Soft border */
+  background-color: #f8fafc; /* Very light gray background */
+  color: #0f172a; /* Dark text */
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  resize: none;
+  transition: all 0.2s ease;
+}
+
+.custom-rules-textarea::placeholder {
+  color: #94a3b8;
+}
+
+.custom-rules-textarea:focus {
+  outline: none;
+  border-color: #0284c7; /* Brand Blue */
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15); /* Soft blue glow */
+  background-color: #ffffff;
+}
+
+.custom-rules-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* --- Dark Mode Support (if your app uses data-theme='dark') --- */
+[data-theme='dark'] .custom-rules-label {
+  color: #94a3b8;
+}
+[data-theme='dark'] .custom-rules-textarea {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #f8fafc;
+}
+[data-theme='dark'] .custom-rules-textarea:focus {
+  background-color: #0f172a;
+}

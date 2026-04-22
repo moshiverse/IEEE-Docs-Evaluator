@@ -1,6 +1,6 @@
 import { formatDateTime } from '../../utils/dashboardUtils';
 
-function TeacherHistoryTable({ logs, allCount = 0, loading, onView }) {
+function TeacherHistoryTable({ logs, allCount = 0, loading, onView, onDelete }) {
   return (
     <div className="card">
       <table className="app-table">
@@ -37,6 +37,14 @@ function TeacherHistoryTable({ logs, allCount = 0, loading, onView }) {
                 </td>
                 <td>
                   <button className="btn btn--soft" onClick={() => onView(log)}>View Full Report</button>
+                  <button 
+                    className="btn btn--danger btn--small" 
+                    style={{ marginLeft: '8px' }}
+                    onClick={() => onDelete(log.id)}
+                    title="Remove from view (data preserved in database)"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))

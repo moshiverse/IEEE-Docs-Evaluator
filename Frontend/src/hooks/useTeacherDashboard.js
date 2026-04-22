@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   analyzeSubmission,
+  fetchAiRuntimeSettings,
   fetchClassRoster,
   fetchTeacherHistory,
   fetchTeacherSettings,
   fetchTeacherSubmissions,
   saveEvaluation,
+  saveMultipleSettings,
   saveSetting,
   sendEvaluation,
 } from '../services/dashboardService';
@@ -25,6 +27,7 @@ export function useTeacherDashboard(showToast) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [isAnalyzeOpen, setIsAnalyzeOpen] = useState(false);
+  const [customRules, setCustomRules] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [aiResult, setAiResult] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -42,16 +45,32 @@ export function useTeacherDashboard(showToast) {
   const [reportSelectedSection, setReportSelectedSection] = useState('');
   const [reportSelectedTeamCode, setReportSelectedTeamCode] = useState('');
 
+  const [deletedReportIds, setDeletedReportIds] = useState(() => {
+    const saved = localStorage.getItem('deletedTeacherReportIds');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [settings, setSettings] = useState([]);
   const [editedSettings, setEditedSettings] = useState({});
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [isSavingAll, setIsSavingAll] = useState(false);
+  const [aiRuntimeSettings, setAiRuntimeSettings] = useState(null);
 
   const [roster, setRoster] = useState([]);
 
   // Holds the AbortController for the currently running analysis.
   // Each new runAnalysis() call creates a fresh one, cancelling any prior run.
   const analysisAbortRef = useRef(null);
+  const selectedFileRef = useRef(null);
+  const isAnalyzeOpenRef = useRef(false);
+
+  useEffect(() => {
+    selectedFileRef.current = selectedFile;
+  }, [selectedFile]);
+
+  useEffect(() => {
+    isAnalyzeOpenRef.current = isAnalyzeOpen;
+  }, [isAnalyzeOpen]);
 
   async function loadSubmissions() {
     try {
@@ -83,13 +102,26 @@ export function useTeacherDashboard(showToast) {
     try {
       setLoadingSettings(true);
       setError('');
-      const data = await fetchTeacherSettings();
-      setSettings(data);
+      const [allSettings, runtimeSettings] = await Promise.all([
+        fetchTeacherSettings(),
+        fetchAiRuntimeSettings(),
+      ]);
+      setSettings(allSettings);
+      setAiRuntimeSettings(runtimeSettings);
       setEditedSettings({});
     } catch (err) {
       setError(`Failed to load settings: ${err.message}`);
     } finally {
       setLoadingSettings(false);
+    }
+  }
+
+  async function loadAiRuntime() {
+    try {
+      const runtimeSettings = await fetchAiRuntimeSettings();
+      setAiRuntimeSettings(runtimeSettings);
+    } catch {
+      // Keep UI usable with fallback options when runtime endpoint fails.
     }
   }
 
@@ -101,6 +133,7 @@ export function useTeacherDashboard(showToast) {
     if (currentView === 'submissions') {
       loadSubmissions();
       loadHistory();
+      loadAiRuntime();
     }
     if (currentView === 'reports') loadHistory();
     if (currentView === 'settings') loadSettings();
@@ -227,34 +260,37 @@ export function useTeacherDashboard(showToast) {
   const filteredHistoryLogs = useMemo(() => {
     const query = reportSearchQuery.trim().toLowerCase();
 
-    return historyLogs.filter((log) => {
-      const docType = extractSubmissionMeta(log.fileName).documentType;
-      const meta = extractSubmissionMeta(log.fileName);
+    return historyLogs
+      .filter((log) => !deletedReportIds.includes(log.id))
+      .filter((log) => {
+        const docType = extractSubmissionMeta(log.fileName).documentType;
+        const meta = extractSubmissionMeta(log.fileName);
 
-      if (reportStatusFilter === 'sent' && !log.isSent) return false;
-      if (reportStatusFilter === 'pending' && log.isSent) return false;
-      if (reportDocTypeFilter && docType !== reportDocTypeFilter) return false;
-      if (reportSelectedStudent && meta.studentName !== reportSelectedStudent) return false;
-      if (reportSelectedSection && meta.section !== normalizeSection(reportSelectedSection)) return false;
-      if (reportSelectedTeamCode && meta.teamCode !== reportSelectedTeamCode.toUpperCase()) return false;
+        if (reportStatusFilter === 'sent' && !log.isSent) return false;
+        if (reportStatusFilter === 'pending' && log.isSent) return false;
+        if (reportDocTypeFilter && docType !== reportDocTypeFilter) return false;
+        if (reportSelectedStudent && meta.studentName !== reportSelectedStudent) return false;
+        if (reportSelectedSection && meta.section !== normalizeSection(reportSelectedSection)) return false;
+        if (reportSelectedTeamCode && meta.teamCode !== reportSelectedTeamCode.toUpperCase()) return false;
 
-      if (query) {
-        const searchable = [
-          log.fileName,
-          log.isSent ? 'sent' : 'pending',
-          log.evaluatedAt,
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
+        if (query) {
+          const searchable = [
+            log.fileName,
+            log.isSent ? 'sent' : 'pending',
+            log.evaluatedAt,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
 
-        if (!searchable.includes(query)) return false;
-      }
+          if (!searchable.includes(query)) return false;
+        }
 
-      return true;
-    });
+        return true;
+      });
   }, [
     historyLogs,
+    deletedReportIds,
     reportSearchQuery,
     reportStatusFilter,
     reportDocTypeFilter,
@@ -263,6 +299,8 @@ export function useTeacherDashboard(showToast) {
     reportSelectedTeamCode,
   ]);
 
+  const allHistoryCount = historyLogs.filter((log) => !deletedReportIds.includes(log.id)).length;
+
   function clearReportFilters() {
     setReportSelectedStudent('');
     setReportSelectedSection('');
@@ -270,6 +308,13 @@ export function useTeacherDashboard(showToast) {
     setReportStatusFilter('');
     setReportDocTypeFilter('');
     setReportSearchQuery('');
+  }
+
+  function deleteReport(reportId) {
+    const updated = [...deletedReportIds, reportId];
+    setDeletedReportIds(updated);
+    localStorage.setItem('deletedTeacherReportIds', JSON.stringify(updated));
+    showToast('Report deleted from view.', 'success');
   }
 
   async function handleManualSync() {
@@ -301,18 +346,35 @@ export function useTeacherDashboard(showToast) {
   }
 
   function openAnalyzeModal(file) {
+    if (analysisAbortRef.current && selectedFileRef.current?.id !== file?.id) {
+      analysisAbortRef.current.abort();
+      analysisAbortRef.current = null;
+      setIsAnalyzing(false);
+    }
     setSelectedFile(file);
     setAiResult('');
     setIsAnalyzeOpen(true);
+    loadAiRuntime();
   }
 
+  function closeAnalyzeModal() {
+    if (analysisAbortRef.current) {
+      analysisAbortRef.current.abort();
+      analysisAbortRef.current = null;
+    }
+
+    setIsAnalyzing(false);
+    setAiResult('');
+    setSelectedFile(null);
+    setIsAnalyzeOpen(false);
+  }
+
+  // --- NEW: Added customInstructions to the runAnalysis parameters ---
   async function runAnalysis(modelName) {
     if (!selectedFile) return;
 
-    // Cancel any previous analysis still in flight
-    if (analysisAbortRef.current) {
-      analysisAbortRef.current.abort();
-    }
+    // Do not start another run while one is still in progress.
+    if (analysisAbortRef.current && !analysisAbortRef.current.signal.aborted) return;
 
     // Fresh controller for this specific run
     const controller = new AbortController();
@@ -324,15 +386,20 @@ export function useTeacherDashboard(showToast) {
       setIsAnalyzing(true);
       setAiResult('');
 
+      // --- NEW: Pass customInstructions into analyzeSubmission ---
       const data = await analyzeSubmission(
         fileToAnalyze.id,
         fileToAnalyze.name,
         modelName,
+        customRules,
         controller.signal,
       );
 
       // If this run was aborted because a newer one started, bail silently
       if (controller.signal.aborted) return;
+
+      // Ignore stale completions if user switched to another file or closed modal.
+      if (!isAnalyzeOpenRef.current || selectedFileRef.current?.id !== fileToAnalyze.id) return;
 
       const result = data.analysis || data;
       setAiResult(result);
@@ -411,10 +478,27 @@ export function useTeacherDashboard(showToast) {
     }
   }
 
+  async function saveAiSettingsBatch(payload) {
+    if (!payload || !Object.keys(payload).length) return;
+
+    try {
+      setIsSavingAll(true);
+      await saveMultipleSettings(payload);
+      showToast('AI settings saved.', 'success');
+      await loadSettings();
+    } catch (err) {
+      showToast(`Failed to save AI settings: ${err.message}`, 'error');
+    } finally {
+      setIsSavingAll(false);
+    }
+  }
+
   return {
     currentView,
     setCurrentView,
     files: sortedFiles,
+    customRules,
+    setCustomRules,
     filterOptions,
     submissionStats,
     selectedStudent,
@@ -427,7 +511,7 @@ export function useTeacherDashboard(showToast) {
     analyzedFileIds,
     error,
     historyLogs: filteredHistoryLogs,
-    allHistoryCount: historyLogs.length,
+    allHistoryCount,
     reportDocTypeOptions,
     reportFilterOptions,
     reportSearchQuery,
@@ -439,11 +523,13 @@ export function useTeacherDashboard(showToast) {
     loadingHistory,
     settings,
     loadingSettings,
+    aiRuntimeSettings,
     editedSettings,
     isSavingAll,
     dirtyCount: Object.keys(editedSettings).length,
     isAnalyzeOpen,
     setIsAnalyzeOpen,
+    closeAnalyzeModal,
     selectedFile,
     aiResult,
     isAnalyzing,
@@ -477,7 +563,10 @@ export function useTeacherDashboard(showToast) {
     sendHistoryToStudent,
     closeHistoryModal,
     handleSettingChange,
+    saveAiSettingsBatch,
     saveAllSettings,
     loadSettings,
+    deleteReport,
+    deletedReportIds,
   };
 }
