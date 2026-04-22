@@ -12,7 +12,7 @@ public class PromptSharedRulesService {
 
         if (previousEvaluation != null && !previousEvaluation.isBlank()) {
             revisionStep = """
-                STEP 5 - REVISION ANALYSIS (conditional — execute only if a previous evaluation is present):
+                STEP 4 - REVISION ANALYSIS (conditional — execute only if a previous evaluation is present):
                 You have access ONLY to your PREVIOUS EVALUATION report. You do NOT have the old document text.
                 Detect changes by checking whether the current document resolves the specific issues listed
                 under 'Weaknesses', 'Missing Sections', and 'Recommendations' in the previous evaluation.
@@ -49,7 +49,7 @@ public class PromptSharedRulesService {
 
                 **Next Steps**:
                 * (Highly specific, granular suggestions for the next iteration,
-                   tied to the unresolved issues above)
+                    tied to the unresolved issues above)
                 """;
         } else {
             revisionStep   = "";
@@ -120,7 +120,7 @@ public class PromptSharedRulesService {
             STEP 2 — VISUAL ANALYSIS (diagrams, figures, tables)
             ═══════════════════════════════════════════════════════════
             You have been provided with rendered page images of this document labeled as [IMG-1], [IMG-2], etc.
-            For EVERY diagram, figure, or table visible in these [IMG-X] images, you MUST:
+            For EVERY diagram, figure, or table visible in these images, you MUST:
 
             1. IDENTIFY the diagram type precisely:
                - UML: Class, Use Case, Sequence, Activity, State, Component, Deployment
@@ -159,8 +159,7 @@ public class PromptSharedRulesService {
                  - Issues: <specific errors, missing elements, or inconsistencies>
                  - Alignment: <whether the diagram matches the written content>
 
-            If no diagrams or figures are detected in the images, output:
-               Diagram Analysis: No diagrams detected in the provided [IMG-X] page visuals.
+            If no diagrams or figures are detected in the images, make a note of this to output "None detected." in STEP 6. Do NOT output the literal string "[IMG-X]" if there are no images.
 
             ═══════════════════════════════════════════════════════════
             STEP 3 — RUBRIC
@@ -181,7 +180,7 @@ public class PromptSharedRulesService {
               1 = Absent, incorrect, or contradicts other sections of the document
 
             For each criterion, your justification MUST:
-              (a) Reference a specific section, passage, OR DIAGRAM [IMG-X] (Evidence rule above)
+              (a) Reference a specific section, passage, OR DIAGRAM (Evidence rule above)
               (b) Explain WHY that evidence maps to the assigned score tier. IF A DIAGRAM CONTAINS NOTATION ERRORS, YOU MUST LOWER THE SCORE FOR THAT SECTION.
               (c) Match the numeric score to the tier described in your prose
 
@@ -204,7 +203,7 @@ public class PromptSharedRulesService {
             %s
 
             Diagram Analysis:
-            (Populated from STEP 2 above — one entry per [IMG-X] figure/diagram found)
+            * (Populated from STEP 2 above — one entry per diagram found. If none, output exactly: "None detected.")
 
             Missing Sections:
             * (IEEE-required sections that are entirely absent from the document)
@@ -223,15 +222,17 @@ public class PromptSharedRulesService {
             Summary:
             * (2–3 bullet points — overall technical state of the document)
 
+            Conclusion:
+            * Provide a definitive, overarching verdict on the document's readiness for the next phase of development.
+            * Synthesize the primary strengths and critical flaws into a clear statement regarding its adherence to IEEE standards.
+            * State explicitly whether the document is "Accepted", "Needs Minor Revisions", or "Requires Major Rework".
+
             Rubric Evaluation:
             * <Criterion 1>: X/5 — (Evidence: "...") — <justification tied to score tier>
             * <Criterion 2>: X/5 — (Evidence: "...") — <justification tied to score tier>
             * <Criterion 3>: X/5 — (Evidence: "...") — <justification tied to score tier>
             * <Criterion 4>: X/5 — (Evidence: "...") — <justification tied to score tier>
             * <Criterion 5>: X/5 — (Evidence: "...") — <justification tied to score tier>
-
-            Conclusion:
-            * (One focused judgment on the engineering rigor and IEEE compliance of the document)
 
             ═══════════════════════════════════════════════════════════
             DOCUMENT TO EVALUATE:
