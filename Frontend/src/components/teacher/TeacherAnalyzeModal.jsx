@@ -131,7 +131,7 @@ function TeacherAnalyzeModal({
               fontSize: '0.85rem', 
               textAlign: 'center' 
           }}>
-            <strong style={{ display: 'block', marginBottom: '4px' }}>⚠️ Please do not refresh the page.</strong>
+            <strong style={{ display: 'block', marginBottom: '4px' }}>PLEASE DO NOT REFRESH THE PAGE.</strong>
             Heavy documents with complex diagrams can take up to 5 minutes to process.
           </div>
         </div>
