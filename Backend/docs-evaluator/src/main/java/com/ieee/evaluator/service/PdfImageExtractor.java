@@ -25,9 +25,11 @@ public class PdfImageExtractor {
     // AI vision analysis of technical diagrams.
     private static final float RENDER_DPI        = 200f;
 
-    // JPEG at 0.92 quality is visually lossless for diagrams but ~5x smaller
-    // than PNG at 250 DPI, significantly reducing API token usage per page.
-    private static final float JPEG_QUALITY      = 0.70f;
+    // JPEG at 0.85 quality balances artifact-free line art (critical for UML/ERD
+    // notation) with payload reduction (~35% smaller than 0.92). Below 0.80,
+    // blocking artifacts on thin diagram edges and small labels are likely to
+    // degrade model accuracy on fine notation.
+    private static final float JPEG_QUALITY      = 0.85f;
 
     public List<String> extractFirstPagesAsBase64Pngs(byte[] pdfBytes) throws Exception {
         return extractFirstPagesAsBase64Pngs(pdfBytes, DEFAULT_MAX_PAGES);

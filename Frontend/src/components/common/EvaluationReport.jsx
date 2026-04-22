@@ -1,7 +1,10 @@
 /* eslint-disable react/prop-types */
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 
-// --- Helper: Extract and structure the Diagram Analysis ---
+// ---------------------------------------------------------------------------
+// Pure parsing helpers — no side effects, safe to call outside render
+// ---------------------------------------------------------------------------
+
 function parseDiagramCritiques(bodyText) {
     if (!bodyText) return [];
 
@@ -9,127 +12,113 @@ function parseDiagramCritiques(bodyText) {
     const lines = bodyText.split('\n');
     let currentCritique = null;
 
-    lines.forEach(line => {
+    for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed) return;
+        if (!trimmed) continue;
 
-        // Match the start of a new image critique: "* [IMG-1] - Use Case Diagram:"
         const headerMatch = trimmed.match(/^\*?\s*\[IMG-(\d+)\]\s*-\s*(.+?):(.*)/i);
-        
-        if (headerMatch) {
-            // Save the previous critique if it exists
-            if (currentCritique) critiques.push(currentCritique);
 
+        if (headerMatch) {
+            if (currentCritique) critiques.push(currentCritique);
             currentCritique = {
-                index: parseInt(headerMatch[1], 10) - 1, // 0-based
+                index: parseInt(headerMatch[1], 10) - 1,
                 type: headerMatch[2].trim(),
                 summary: headerMatch[3].trim(),
                 details: []
             };
         } else if (currentCritique) {
-            // It's a detail line for the current critique (e.g., "- Notation observed: ...")
-            // Clean up list markers for cleaner rendering in the card
-            let cleanLine = trimmed.replace(/^[-*]\s*/, '');
-            if (cleanLine) {
-                 currentCritique.details.push(cleanLine);
-            }
+            const cleanLine = trimmed.replace(/^[-*]\s*/, '');
+            if (cleanLine) currentCritique.details.push(cleanLine);
         } else {
-             // Handle the "No diagrams detected" case or preamble text
-             if (!trimmed.includes('CRITICAL: You MUST provide')) {
-                  critiques.push({ type: 'General Note', details: [trimmed] });
-             }
+            if (!trimmed.includes('CRITICAL: You MUST provide')) {
+                critiques.push({ type: 'General Note', details: [trimmed] });
+            }
         }
-    });
+    }
 
     if (currentCritique) critiques.push(currentCritique);
     return critiques;
 }
 
-// ... existing extractDiagramCritiques function (keep this for the lightbox)
 function extractDiagramCritiques(sections) {
     const diagramSection = sections.find(s => s.heading === 'Diagram Analysis');
     if (!diagramSection) return {};
 
     const critiques = {};
-    const lines = diagramSection.body.split('\n');
-    lines.forEach(line => {
+    for (const line of diagramSection.body.split('\n')) {
         const match = line.match(/\*?\s*\[IMG-(\d+)\]\s*-(.+)/i);
         if (match) {
-            const index = parseInt(match[1], 10) - 1; 
-            critiques[index] = match[2].trim();
+            critiques[parseInt(match[1], 10) - 1] = match[2].trim();
         }
-    });
+    }
     return critiques;
 }
 
-function renderInline(text, onImageClick) {
+function parseEvaluationSections(text) {
     if (!text) return null;
+    let normalized = text.trim();
+    if (normalized.startsWith('"') && normalized.endsWith('"')) normalized = normalized.slice(1, -1).trim();
 
-    const boldParts = text.split(/(\*\*[^*]+\*\*)/);
+    const KW = 'Summary|Rubric Evaluation|Strengths|Weaknesses|Missing Sections|Recommendations|Conclusion|Revision Analysis|Remaining Issues|Next Steps|Diagram Analysis';
+    const splitRe = new RegExp(`(?:^|\\n)(?=\\s*#{1,3}\\s*(?:\\*\\*)?(?:${KW})(?:\\*\\*)?|\\s*\\*\\*(?:${KW}):?\\*\\*|\\s*(?:${KW}):?\\s*(?:\\n|$))`);
 
-    return boldParts.map((boldPart, i) => {
-        const boldMatch = boldPart.match(/^\*\*([^*]+)\*\*$/);
-        
-        if (boldMatch) {
-            return <strong key={i}>{processImgTags(boldMatch[1], onImageClick, `bold-${i}`)}</strong>;
-        } else {
-            return <span key={i}>{processImgTags(boldPart, onImageClick, `normal-${i}`)}</span>;
-        }
-    });
+    const firstSectionMatch = normalized.match(splitRe);
+    let headerContent = '';
+    let mainContent = normalized;
+
+    if (firstSectionMatch) {
+        headerContent = normalized.slice(0, firstSectionMatch.index).trim();
+        mainContent = normalized.slice(firstSectionMatch.index).trim();
+    }
+
+    const headingRe = new RegExp(`^\\s*(?:#{1,3}\\s*)?\\*?\\*?(${KW}):?\\*?\\*?:?\\s*(.*)`, 'i');
+    const sections = mainContent.split(splitRe).filter(b => b.trim()).map((block) => {
+        const cleanBlock = block.trim();
+        const nl = cleanBlock.indexOf('\n');
+        const firstLine = nl === -1 ? cleanBlock : cleanBlock.slice(0, nl);
+        const rest = nl === -1 ? '' : cleanBlock.slice(nl + 1);
+        const m = firstLine.match(headingRe);
+        if (!m) return null;
+        const heading = m[1].trim();
+        const inlineBody = (m[2] || '').trim();
+        const fullBody = [inlineBody, rest.trim()].filter(Boolean).join('\n');
+        return { heading, body: fullBody };
+    }).filter(Boolean);
+
+    return { headerContent, sections };
 }
+
+// ---------------------------------------------------------------------------
+// Inline renderers
+// ---------------------------------------------------------------------------
 
 function processImgTags(text, onImageClick, keyPrefix) {
     if (!text) return null;
-    
     const parts = text.split(/(\[IMG-\d+\])/i);
-    
     return parts.map((part, j) => {
         const imgMatch = part.match(/\[IMG-(\d+)\]/i);
         if (imgMatch) {
             const index = parseInt(imgMatch[1], 10) - 1;
             return (
-                <button 
+                <ImgTagButton
                     key={`${keyPrefix}-img-${j}`}
-                    className="img-tag-btn"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (onImageClick) {
-                            onImageClick(index);
-                        }
-                    }}
-                    style={{
-                        /* EXPLICIT BUTTON STYLES - Hardcoded colors to guarantee visibility */
-                        backgroundColor: '#e0f2fe', /* Light blue background */
-                        color: '#0369a1',           /* Dark blue text */
-                        border: '1px solid #7dd3fc',/* Noticeable blue border */
-                        borderRadius: '6px',        /* Rounded corners */
-                        padding: '4px 8px',         /* Good padding */
-                        fontSize: '0.85em',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                        margin: '0 4px',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)', /* Subtle shadow */
-                        transition: 'all 0.2s ease',
-                        display: 'inline-block'     /* Ensure it behaves like a block for padding */
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#bae6fd'; /* Slightly darker blue on hover */
-                        e.currentTarget.style.borderColor = '#38bdf8';
-                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#e0f2fe';
-                        e.currentTarget.style.borderColor = '#7dd3fc';
-                        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
-                    }}
-                >
-                    {/* Make the text clearer, e.g., "Image 1" instead of "[IMG-1]" */}
-                    Image {index + 1}
-                </button>
+                    index={index}
+                    onImageClick={onImageClick}
+                />
             );
         }
         return <React.Fragment key={`${keyPrefix}-text-${j}`}>{part}</React.Fragment>;
+    });
+}
+
+function renderInline(text, onImageClick) {
+    if (!text) return null;
+    return text.split(/(\*\*[^*]+\*\*)/).map((part, i) => {
+        const boldMatch = part.match(/^\*\*([^*]+)\*\*$/);
+        if (boldMatch) {
+            return <strong key={i}>{processImgTags(boldMatch[1], onImageClick, `bold-${i}`)}</strong>;
+        }
+        return <span key={i}>{processImgTags(part, onImageClick, `normal-${i}`)}</span>;
     });
 }
 
@@ -137,6 +126,7 @@ function renderBody(body, onImageClick) {
     if (!body) return null;
     const result = [];
     let list = [];
+
     const flush = () => {
         if (list.length) {
             result.push(<ul key={`ul-${result.length}`} className="eval-card__list">{list}</ul>);
@@ -155,40 +145,167 @@ function renderBody(body, onImageClick) {
         } else {
             flush();
             if (trimmed.startsWith('**Status**:')) {
-                const statusMatch = trimmed.match(/\*\*Status\*\*:\s*\[?(IMPROVED|WORSENED|SAME)\]?/i);
+                const statusMatch = trimmed.match(/\*\*Status\*\*:\s*\[?(IMPROVED|WORSENED|SAME|PARTIALLY IMPROVED)\]?/i);
                 const statusText = statusMatch ? statusMatch[1].toUpperCase() : 'UNKNOWN';
                 result.push(
                     <div key={i} className="eval-card__status-row">
                         <strong>Status:</strong>
-                        <span className={`eval-status-badge eval-status-badge--${statusText.toLowerCase()}`}>
+                        <span className={`eval-status-badge eval-status-badge--${statusText.toLowerCase().replace(' ', '-')}`}>
                             {statusText}
                         </span>
                     </div>
                 );
-            }
-            else if (trimmed.includes('/') && !isNaN(trimmed.split('/')[0].trim().split(' ').pop())) {
+            } else if (trimmed.includes('/') && !isNaN(trimmed.split('/')[0].trim().split(' ').pop())) {
                 result.push(<div key={i} className="eval-card__large-score">{renderInline(trimmed, onImageClick)}</div>);
-            }
-            else if (trimmed.startsWith('**')) {
+            } else if (trimmed.startsWith('**')) {
                 result.push(<p key={i} className="eval-card__subheading">{renderInline(trimmed, onImageClick)}</p>);
-            }
-            else {
+            } else {
                 result.push(<p key={i} className="eval-card__note">{renderInline(trimmed, onImageClick)}</p>);
             }
         }
     });
+
     flush();
     return result;
 }
 
-// --- NEW: Custom Renderer for the Diagram Analysis Section ---
-function renderDiagramAnalysisCards(body, onImageClick) {
-    const critiques = parseDiagramCritiques(body);
+// ---------------------------------------------------------------------------
+// Small memoized sub-components to avoid re-creating handlers every render
+// ---------------------------------------------------------------------------
+
+// Extracted so hover handlers are defined once, not per-render
+const IMG_BTN_BASE = {
+    backgroundColor: '#e0f2fe',
+    color: '#0369a1',
+    border: '1px solid #7dd3fc',
+    borderRadius: '6px',
+    padding: '4px 8px',
+    fontSize: '0.85em',
+    cursor: 'pointer',
+    fontWeight: '600',
+    margin: '0 4px',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+    transition: 'all 0.2s ease',
+    display: 'inline-block',
+};
+
+const ImgTagButton = memo(function ImgTagButton({ index, onImageClick }) {
+    const handleClick = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onImageClick?.(index);
+    }, [index, onImageClick]);
+
+    const handleMouseEnter = useCallback((e) => {
+        e.currentTarget.style.backgroundColor = '#bae6fd';
+        e.currentTarget.style.borderColor = '#38bdf8';
+        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
+    }, []);
+
+    const handleMouseLeave = useCallback((e) => {
+        e.currentTarget.style.backgroundColor = '#e0f2fe';
+        e.currentTarget.style.borderColor = '#7dd3fc';
+        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+    }, []);
+
+    return (
+        <button
+            className="img-tag-btn"
+            style={IMG_BTN_BASE}
+            onClick={handleClick}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+        >
+            Image {index + 1}
+        </button>
+    );
+});
+
+const DiagramCard = memo(function DiagramCard({ critique, onImageClick }) {
+    const handleImgClick = useCallback((e) => {
+        e.preventDefault();
+        onImageClick(critique.index);
+    }, [critique.index, onImageClick]);
+
+    const handleMouseEnter = useCallback((e) => {
+        e.currentTarget.style.backgroundColor = '#bae6fd';
+        e.currentTarget.style.borderColor = '#38bdf8';
+        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
+    }, []);
+
+    const handleMouseLeave = useCallback((e) => {
+        e.currentTarget.style.backgroundColor = '#e0f2fe';
+        e.currentTarget.style.borderColor = '#7dd3fc';
+        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+    }, []);
+
+    return (
+        <div style={{
+            background: 'var(--surface-sunken)',
+            border: '1px solid var(--line-soft)',
+            borderRadius: '8px',
+            padding: '1rem',
+            position: 'relative',
+        }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {critique.index !== undefined && (
+                        <button
+                            style={{
+                                backgroundColor: '#e0f2fe',
+                                color: '#0369a1',
+                                border: '1px solid #7dd3fc',
+                                borderRadius: '6px',
+                                padding: '4px 10px',
+                                fontSize: '0.85rem',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                transition: 'all 0.2s ease',
+                            }}
+                            onClick={handleImgClick}
+                            onMouseEnter={handleMouseEnter}
+                            onMouseLeave={handleMouseLeave}
+                        >
+                            Image {critique.index + 1}
+                        </button>
+                    )}
+                    {renderInline(critique.type, onImageClick)}
+                </h4>
+            </div>
+
+            {critique.summary && (
+                <p style={{ margin: '0 0 0.75rem 0', fontStyle: 'italic', color: 'var(--text-muted)' }}>
+                    {renderInline(critique.summary, onImageClick)}
+                </p>
+            )}
+
+            {critique.details.length > 0 && (
+                <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-main)' }}>
+                    {critique.details.map((detail, dIdx) => {
+                        const splitDetail = detail.split(/^(.*?):/);
+                        if (splitDetail.length > 1) {
+                            return (
+                                <li key={dIdx} style={{ marginBottom: '4px' }}>
+                                    <strong>{splitDetail[1]}:</strong> {renderInline(splitDetail[2], onImageClick)}
+                                </li>
+                            );
+                        }
+                        return <li key={dIdx} style={{ marginBottom: '4px' }}>{renderInline(detail, onImageClick)}</li>;
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+});
+
+// Memoized so it only re-renders when body or onImageClick changes
+const DiagramAnalysisSection = memo(function DiagramAnalysisSection({ body, onImageClick }) {
+    const critiques = useMemo(() => parseDiagramCritiques(body), [body]);
 
     if (critiques.length === 0) {
         return <p className="eval-card__note">No diagram analysis available.</p>;
     }
-
     if (critiques.length === 1 && critiques[0].type === 'General Note') {
         return <p className="eval-card__note">{critiques[0].details[0]}</p>;
     }
@@ -196,141 +313,58 @@ function renderDiagramAnalysisCards(body, onImageClick) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {critiques.map((critique, idx) => (
-                <div 
-                    key={idx} 
-                    style={{
-                        background: 'var(--surface-sunken)',
-                        border: '1px solid var(--line-soft)',
-                        borderRadius: '8px',
-                        padding: '1rem',
-                        position: 'relative'
-                    }}
-                >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                        <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {critique.index !== undefined && (
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        onImageClick(critique.index);
-                                    }}
-                                    style={{
-                                        /* EXPLICIT BUTTON STYLES - Hardcoded colors to guarantee visibility */
-                                        backgroundColor: '#e0f2fe',
-                                        color: '#0369a1',
-                                        border: '1px solid #7dd3fc',
-                                        borderRadius: '6px',
-                                        padding: '4px 10px',
-                                        fontSize: '0.85rem',
-                                        fontWeight: 'bold',
-                                        cursor: 'pointer',
-                                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                                        transition: 'all 0.2s ease',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.backgroundColor = '#bae6fd';
-                                        e.currentTarget.style.borderColor = '#38bdf8';
-                                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.backgroundColor = '#e0f2fe';
-                                        e.currentTarget.style.borderColor = '#7dd3fc';
-                                        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
-                                    }}
-                                >
-                                    Image {critique.index + 1}
-                                </button>
-                            )}
-                            {/* Pass onImageClick down here so any inline tags in the type are clickable */}
-                            {renderInline(critique.type, onImageClick)}
-                        </h4>
-                    </div>
-                    
-                    {critique.summary && (
-                        <p style={{ margin: '0 0 0.75rem 0', fontStyle: 'italic', color: 'var(--text-muted)' }}>
-                            {/* Pass onImageClick down here */}
-                            {renderInline(critique.summary, onImageClick)}
-                        </p>
-                    )}
-
-                    {critique.details.length > 0 && (
-                        <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-main)' }}>
-                            {critique.details.map((detail, dIdx) => {
-                                // Bold the labels like "Notation observed:" or "Issues:"
-                                const splitDetail = detail.split(/^(.*?):/);
-                                if (splitDetail.length > 1) {
-                                    return (
-                                        <li key={dIdx} style={{ marginBottom: '4px' }}>
-                                            {/* Pass onImageClick down here */}
-                                            <strong>{splitDetail[1]}:</strong> {renderInline(splitDetail[2], onImageClick)}
-                                        </li>
-                                    );
-                                }
-                                // Pass onImageClick down here
-                                return <li key={dIdx} style={{ marginBottom: '4px' }}>{renderInline(detail, onImageClick)}</li>;
-                            })}
-                        </ul>
-                    )}
-                </div>
+                <DiagramCard key={idx} critique={critique} onImageClick={onImageClick} />
             ))}
         </div>
     );
-}
+});
 
-function parseEvaluationSections(text) {
-    if (!text) return null;
-    let normalized = text.trim();
-    if (normalized.startsWith('"') && normalized.endsWith('"')) normalized = normalized.slice(1, -1).trim();
+// Memoized thumbnail — avoids re-decoding base64 on unrelated re-renders
+const PageThumbnail = memo(function PageThumbnail({ img, idx, onClick }) {
+    const handleClick = useCallback(() => onClick(idx), [idx, onClick]);
+    const handleMouseEnter = useCallback(e => {
+        e.currentTarget.style.transform = 'scale(1.04)';
+        e.currentTarget.style.boxShadow = '0 4px 14px var(--shadow)';
+    }, []);
+    const handleMouseLeave = useCallback(e => {
+        e.currentTarget.style.transform = 'scale(1)';
+        e.currentTarget.style.boxShadow = '0 2px 6px var(--shadow)';
+    }, []);
 
-    const KW = 'Summary|Rubric Evaluation|Strengths|Weaknesses|Missing Sections|Recommendations|Conclusion|Revision Analysis|Remaining Issues|Next Steps|Diagram Analysis';
-    const splitRe = new RegExp(`(?:^|\\n)(?=\\s*#{1,3}\\s*(?:\\*\\*)?(?:${KW})(?:\\*\\*)?|\\s*\\*\\*(?:${KW}):?\\*\\*|\\s*(?:${KW}):?\\s*(?:\\n|$))`);
+    return (
+        <div
+            className="preview-item"
+            onClick={handleClick}
+            title={`Click to view analysis — Page ${idx + 1}`}
+            style={{
+                flex: '0 0 110px',
+                height: '140px',
+                borderRadius: '8px',
+                border: '1px solid var(--line-soft)',
+                overflow: 'hidden',
+                background: '#fff',
+                boxShadow: '0 2px 6px var(--shadow)',
+                cursor: 'pointer',
+                transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+            }}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+        >
+            <img
+                src={`data:image/jpeg;base64,${img}`}
+                alt={`Page ${idx + 1}`}
+                loading="lazy"
+                style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
+            />
+        </div>
+    );
+});
 
-    const firstSectionMatch = normalized.match(splitRe);
-    let headerContent = "";
-    let mainContent = normalized;
+// ---------------------------------------------------------------------------
+// Lightbox
+// ---------------------------------------------------------------------------
 
-    if (firstSectionMatch) {
-        headerContent = normalized.slice(0, firstSectionMatch.index).trim();
-        mainContent = normalized.slice(firstSectionMatch.index).trim();
-    }
-
-    const blocks = mainContent.split(splitRe).filter(b => b.trim());
-    const headingRe = new RegExp(`^\\s*(?:#{1,3}\\s*)?\\*?\\*?(${KW}):?\\*?\\*?:?\\s*(.*)`, "i");
-
-    const sections = blocks.map((block) => {
-        const cleanBlock = block.trim();
-        const nl = cleanBlock.indexOf('\n');
-        const firstLine = nl === -1 ? cleanBlock : cleanBlock.slice(0, nl);
-        const rest = nl === -1 ? '' : cleanBlock.slice(nl + 1);
-
-        const m = firstLine.match(headingRe);
-        if (!m) return null;
-
-        const heading = m[1].trim();
-        const inlineBody = (m[2] || '').trim();
-        const fullBody = [inlineBody, rest.trim()].filter(Boolean).join('\n');
-        return { heading, body: fullBody };
-    }).filter(Boolean);
-
-    return { headerContent, sections };
-}
-
-const SECTION_MOD = {
-    Summary: 'summary',
-    'Rubric Evaluation': 'rubric',
-    Strengths: 'strengths',
-    Weaknesses: 'weaknesses',
-    'Missing Sections': 'missing',
-    Recommendations: 'recommendations',
-    Conclusion: 'conclusion',
-    'Revision Analysis': 'revision',
-    'Remaining Issues': 'weaknesses',
-    'Next Steps': 'recommendations',
-    'Diagram Analysis': 'diagrams', // Specific class if needed
-};
-
-// Sub-component for the Lightbox overlay
-function ImageLightbox({ images, startIndex, onClose, critiques }) {
+const ImageLightbox = memo(function ImageLightbox({ images, startIndex, onClose, critiques }) {
     const [current, setCurrent] = useState(startIndex);
 
     const prev = useCallback(() => setCurrent(i => (i - 1 + images.length) % images.length), [images.length]);
@@ -355,7 +389,7 @@ function ImageLightbox({ images, startIndex, onClose, critiques }) {
                 position: 'fixed', inset: 0, zIndex: 9999,
                 background: 'rgba(0,0,0,0.9)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                padding: '20px'
+                padding: '20px',
             }}
         >
             <button
@@ -387,7 +421,7 @@ function ImageLightbox({ images, startIndex, onClose, critiques }) {
                             color: '#fff', fontSize: '1.8rem', borderRadius: '50%',
                             width: '44px', height: '44px', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            zIndex: 10
+                            zIndex: 10,
                         }}
                         aria-label="Previous page"
                     >
@@ -403,7 +437,7 @@ function ImageLightbox({ images, startIndex, onClose, critiques }) {
                         maxWidth: '80vw', maxHeight: '100%',
                         objectFit: 'contain', borderRadius: '6px',
                         boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
-                        background: '#fff' 
+                        background: '#fff',
                     }}
                 />
 
@@ -416,7 +450,7 @@ function ImageLightbox({ images, startIndex, onClose, critiques }) {
                             color: '#fff', fontSize: '1.8rem', borderRadius: '50%',
                             width: '44px', height: '44px', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            zIndex: 10
+                            zIndex: 10,
                         }}
                         aria-label="Next page"
                     >
@@ -424,10 +458,9 @@ function ImageLightbox({ images, startIndex, onClose, critiques }) {
                     </button>
                 )}
             </div>
-            
-            {/* AI Analysis Panel in Lightbox */}
+
             {currentCritique && (
-                 <div 
+                <div
                     onClick={e => e.stopPropagation()}
                     style={{
                         marginTop: '20px',
@@ -440,7 +473,7 @@ function ImageLightbox({ images, startIndex, onClose, critiques }) {
                         boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
                         borderLeft: '4px solid var(--primary)',
                         overflowY: 'auto',
-                        maxHeight: '20vh'
+                        maxHeight: '20vh',
                     }}
                 >
                     <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', color: 'var(--primary)' }}>
@@ -453,22 +486,51 @@ function ImageLightbox({ images, startIndex, onClose, critiques }) {
             )}
         </div>
     );
-}
+});
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const SECTION_MOD = {
+    Summary: 'summary',
+    'Rubric Evaluation': 'rubric',
+    Strengths: 'strengths',
+    Weaknesses: 'weaknesses',
+    'Missing Sections': 'missing',
+    Recommendations: 'recommendations',
+    Conclusion: 'conclusion',
+    'Revision Analysis': 'revision',
+    'Remaining Issues': 'weaknesses',
+    'Next Steps': 'recommendations',
+    'Diagram Analysis': 'diagrams',
+};
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 function EvaluationReport({ text, images = [] }) {
     const [lightboxIndex, setLightboxIndex] = useState(null);
 
-    const parsed = parseEvaluationSections(text);
-    if (!parsed) return <div className="report-content">{text}</div>;
-    const { headerContent, sections } = parsed;
+    // KEY FIX: memoize the expensive parse so it only runs when text changes
+    const parsed = useMemo(() => parseEvaluationSections(text), [text]);
 
-    const diagramCritiques = useMemo(() => extractDiagramCritiques(sections), [sections]);
+    const { headerContent, sections } = parsed || {};
+
+    // Stable reference — only recomputes when sections changes (which is tied to text)
+    const diagramCritiques = useMemo(
+        () => sections ? extractDiagramCritiques(sections) : {},
+        [sections]
+    );
 
     const handleImageClick = useCallback((index) => {
-        if (images && images.length > index) {
-            setLightboxIndex(index);
-        }
+        if (images && images.length > index) setLightboxIndex(index);
     }, [images]);
+
+    const handleCloseLightbox = useCallback(() => setLightboxIndex(null), []);
+
+    if (!parsed) return <div className="report-content">{text}</div>;
 
     return (
         <div className="eval-report">
@@ -476,11 +538,12 @@ function EvaluationReport({ text, images = [] }) {
                 <ImageLightbox
                     images={images}
                     startIndex={lightboxIndex}
-                    onClose={() => setLightboxIndex(null)}
+                    onClose={handleCloseLightbox}
                     critiques={diagramCritiques}
                 />
             )}
 
+            {/* Document Information */}
             <div className="eval-card eval-card--metadata">
                 <div className="eval-card__header">
                     <span className="eval-card__heading" style={{ color: 'var(--text-main)' }}>Document Information</span>
@@ -490,7 +553,7 @@ function EvaluationReport({ text, images = [] }) {
                 </div>
             </div>
 
-            {/* Visuals Preview Card */}
+            {/* Page thumbnails */}
             {images.length > 0 && (
                 <div className="eval-card eval-card--metadata">
                     <div className="eval-card__header">
@@ -499,44 +562,19 @@ function EvaluationReport({ text, images = [] }) {
                     <div className="eval-card__body">
                         <div className="image-preview-grid" style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px' }}>
                             {images.map((img, idx) => (
-                                <div
-                                    key={idx} 
-                                    className="preview-item"
-                                    onClick={() => setLightboxIndex(idx)}
-                                    title={`Click to view analysis — Page ${idx + 1}`}
-                                    style={{
-                                        flex: '0 0 110px',
-                                        height: '140px',
-                                        borderRadius: '8px',
-                                        border: '1px solid var(--line-soft)',
-                                        overflow: 'hidden',
-                                        background: '#fff',
-                                        boxShadow: '0 2px 6px var(--shadow)',
-                                        cursor: 'pointer',
-                                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                                    }}
-                                    onMouseEnter={e => {
-                                        e.currentTarget.style.transform = 'scale(1.04)';
-                                        e.currentTarget.style.boxShadow = '0 4px 14px var(--shadow)';
-                                    }}
-                                    onMouseLeave={e => {
-                                        e.currentTarget.style.transform = 'scale(1)';
-                                        e.currentTarget.style.boxShadow = '0 2px 6px var(--shadow)';
-                                    }}
-                                >
-                                    <img
-                                        src={`data:image/jpeg;base64,${img}`}
-                                        alt={`Page ${idx + 1}`}
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
-                                    />
-                                </div>
+                                <PageThumbnail
+                                    key={idx}
+                                    img={img}
+                                    idx={idx}
+                                    onClick={setLightboxIndex}
+                                />
                             ))}
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Dynamic Sections */}
+            {/* Dynamic sections */}
             {sections.map((section, i) => (
                 <div key={i} className={`eval-card eval-card--${SECTION_MOD[section.heading] || 'default'}`}>
                     <div className="eval-card__header">
@@ -545,9 +583,8 @@ function EvaluationReport({ text, images = [] }) {
                         </span>
                     </div>
                     <div className="eval-card__body">
-                        {/* Check if this is the Diagram Analysis section and use the custom renderer */}
-                        {section.heading === 'Diagram Analysis' 
-                            ? renderDiagramAnalysisCards(section.body, handleImageClick) 
+                        {section.heading === 'Diagram Analysis'
+                            ? <DiagramAnalysisSection body={section.body} onImageClick={handleImageClick} />
                             : renderBody(section.body, handleImageClick)
                         }
                     </div>
