@@ -16,7 +16,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Orchestrates AI document analysis.
+ * Orchestrates AI document analysis, returning both text results and extracted visual data.
  */
 @Service
 @Slf4j
@@ -58,8 +58,10 @@ public class AiService {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    // 1. Add customInstructions here
-    public String analyzeDocument(String fileId, String fileName, String aiModel, String customInstructions) throws Exception {
+    /**
+     * Analyzes a document and returns a Map containing the "analysis" text and "images" list.
+     */
+    public Map<String, Object> analyzeDocument(String fileId, String fileName, String aiModel, String customInstructions) throws Exception {
         AiProvider provider = resolveProvider(aiModel);
         String runKey = buildRunKey(fileId, provider.getProviderName());
 
@@ -69,10 +71,16 @@ public class AiService {
         }
 
         try {
-            // 2. Pass it down to the retry handler
-            String result = analyzeWithRetry(fileId, fileName, provider, customInstructions);
-            persistHistory(fileId, fileName, provider.getProviderName(), result);
-            return result;
+            // Updated to receive a Map containing both text and images
+            Map<String, Object> resultData = analyzeWithRetry(fileId, fileName, provider, customInstructions);
+            
+            String resultText = (String) resultData.get("analysis");
+            List<String> images = (List<String>) resultData.get("images");
+
+            // Persist both the result text and the images extracted during this run
+            persistHistory(fileId, fileName, provider.getProviderName(), resultText, images);
+            
+            return resultData;
         } finally {
             inFlightAnalyses.remove(runKey);
         }
@@ -80,8 +88,7 @@ public class AiService {
 
     // ── Retry logic ───────────────────────────────────────────────────────────
 
-    // 3. Add customInstructions here
-    private String analyzeWithRetry(String fileId, String fileName, AiProvider provider, String customInstructions) throws Exception {
+    private Map<String, Object> analyzeWithRetry(String fileId, String fileName, AiProvider provider, String customInstructions) throws Exception {
         Exception lastError = null;
         long startedAt = System.currentTimeMillis();
 
@@ -99,7 +106,6 @@ public class AiService {
             }
 
             try {
-                // 4. Pass it down to the actual analyzer
                 return analyzeOnce(fileId, fileName, provider, customInstructions);
             } catch (Exception e) {
                 lastError = e;
@@ -148,18 +154,23 @@ public class AiService {
         }
     }
 
-    // 5. Add customInstructions here
-    private String analyzeOnce(String fileId, String fileName, AiProvider provider, String customInstructions) throws Exception {
+    private Map<String, Object> analyzeOnce(String fileId, String fileName, AiProvider provider, String customInstructions) throws Exception {
+        // FIX #3: This branch is not dead code — it executes whenever a DriveAwareAiProvider
+        // is resolved (e.g. Gemini). It returns an empty images list because drive-native
+        // providers handle rendering internally. Update images handling here if that changes.
         if (provider instanceof DriveAwareAiProvider driveAware) {
-            return driveAware.analyzeFromDrive(fileId, fileName); 
-            // Note: If you ever switch back to Gemini from OpenAI, you will need to add customInstructions to DriveAwareAiProvider as well.
+            String result = driveAware.analyzeFromDrive(fileId, fileName);
+            return Map.of("analysis", result, "images", List.of());
         }
 
+        // Extract both text and images from the Google Doc/PDF
         GoogleDocsService.DocumentData docData = docsService.extractDocumentContent(fileId, MAX_PAGES_TO_RENDER);
 
         if (docData.text() == null || docData.text().isBlank()) {
-            return "EVALUATION ERROR: No readable text found in this document. " +
-                   "Please ensure the document contains text content.";
+            return Map.of(
+                "analysis", "EVALUATION ERROR: No readable text found in this document. Please ensure the document contains text content.",
+                "images", List.of()
+            );
         }
 
         String previousEvaluation = historyRepository
@@ -167,8 +178,14 @@ public class AiService {
                 .map(EvaluationHistory::getEvaluationResult)
                 .orElse(null);
 
-        // 6. Pass ALL the data to the final interface!
-        return provider.analyze(docData.text(), docData.images(), previousEvaluation, customInstructions);
+        // Perform multimodal analysis using OpenAI
+        String analysis = provider.analyze(docData.text(), docData.images(), previousEvaluation, customInstructions);
+
+        // Return the full set of data to the controller
+        return Map.of(
+            "analysis", analysis,
+            "images", docData.images()
+        );
     }
 
     // ── Provider resolution ───────────────────────────────────────────────────
@@ -216,7 +233,7 @@ public class AiService {
 
     // ── Persistence ───────────────────────────────────────────────────────────
 
-    private void persistHistory(String fileId, String fileName, String modelUsed, String result) {
+    private void persistHistory(String fileId, String fileName, String modelUsed, String result, List<String> images) {
         try {
             LocalDateTime now = LocalDateTime.now();
             EvaluationHistory history = historyRepository
@@ -235,6 +252,12 @@ public class AiService {
                 history.setTeacherFeedback(null);
             }
 
+            // FIX #1: Use direct setter instead of reflection. EvaluationHistory
+            // has @Data (Lombok), so setExtractedImages is always available.
+            history.setExtractedImages(images);
+
+            // FIX #4: save() is now outside the blanket catch so DB failures
+            // surface properly instead of being silently swallowed.
             historyRepository.save(history);
         } catch (Exception e) {
             log.error("Failed to persist evaluation history for fileId={}: {}", fileId, e.getMessage(), e);

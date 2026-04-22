@@ -3,7 +3,20 @@ import { useMemo } from 'react';
 import AppModal from '../common/AppModal';
 import EvaluationReport from '../common/EvaluationReport';
 
-function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onRun, aiRuntimeSettings, customRules, setCustomRules, onViewHistory, hasPreviousEvaluation = false }) {
+function TeacherAnalyzeModal({ 
+  isOpen, 
+  file, 
+  aiResult, 
+  aiImages = [], 
+  isAnalyzing, 
+  onClose, 
+  onRun, 
+  aiRuntimeSettings, 
+  customRules, 
+  setCustomRules, 
+  onViewHistory, 
+  hasPreviousEvaluation = false 
+}) {
 
   const hasResult = Boolean(aiResult) && !isAnalyzing;
   const hasHistory = Boolean(hasPreviousEvaluation);
@@ -23,9 +36,11 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
   const selectedModel = selectedProvider?.selectedModel || 'Not configured';
   const hasApiKey = Boolean(selectedProvider?.apiKeyConfigured);
   const hasProvider = Boolean(selectedProvider?.id);
+  
   const subtitlePrimary = hasResult
     ? 'AI evaluation complete'
     : 'Using active AI settings from System Settings';
+    
   const subtitle = (
     <>
       <span>{subtitlePrimary}</span>
@@ -42,7 +57,6 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
 
   function handleEvaluate() {
     if (!selectedProvider || !hasProvider) return;
-    // 2. Pass the customRules up to the parent component when clicked
     onRun(selectedProvider.id);
   }
 
@@ -80,7 +94,6 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
         </p>
       )}
 
-      {/* --- NEW: Custom Rules Text Box --- */}
       {!isAnalyzing && (
         <div className="custom-rules-group">
           <label htmlFor="custom-rules" className="custom-rules-label">
@@ -93,7 +106,7 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
             value={customRules}
             onChange={(e) => setCustomRules(e.target.value)}
             disabled={isAnalyzing}
-            rows={hasResult ? 2 : 3} // Makes it slightly smaller if the report is already showing
+            rows={hasResult ? 2 : 3} 
           />
         </div>
       )}
@@ -106,9 +119,25 @@ function TeacherAnalyzeModal({ isOpen, file, aiResult, isAnalyzing, onClose, onR
           </div>
           <p className="analyze-loading__title">Running AI evaluation...</p>
           <p className="analyze-loading__subtitle">Extracting text and generating analysis for this submission.</p>
+          
+          {/* --- NEW: Timeout Warning Box --- */}
+          <div style={{ 
+              marginTop: '1.5rem', 
+              padding: '1rem', 
+              backgroundColor: 'rgba(245, 158, 11, 0.1)', 
+              color: '#d97706', 
+              borderRadius: '8px', 
+              border: '1px solid rgba(245, 158, 11, 0.3)', 
+              fontSize: '0.85rem', 
+              textAlign: 'center' 
+          }}>
+            <strong style={{ display: 'block', marginBottom: '4px' }}>⚠️ Please do not refresh the page.</strong>
+            Heavy documents with complex diagrams can take up to 5 minutes to process.
+          </div>
         </div>
       )}
-      {hasResult && <EvaluationReport text={aiResult}/>}
+
+      {hasResult && <EvaluationReport text={aiResult} images={aiImages} />}
     </AppModal>
   );
 }

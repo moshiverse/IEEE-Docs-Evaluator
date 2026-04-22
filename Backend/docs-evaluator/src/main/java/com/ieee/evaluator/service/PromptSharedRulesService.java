@@ -12,7 +12,7 @@ public class PromptSharedRulesService {
 
         if (previousEvaluation != null && !previousEvaluation.isBlank()) {
             revisionStep = """
-                STEP 4 - REVISION ANALYSIS (conditional — execute only if a previous evaluation is present):
+                STEP 5 - REVISION ANALYSIS (conditional — execute only if a previous evaluation is present):
                 You have access ONLY to your PREVIOUS EVALUATION report. You do NOT have the old document text.
                 Detect changes by checking whether the current document resolves the specific issues listed
                 under 'Weaknesses', 'Missing Sections', and 'Recommendations' in the previous evaluation.
@@ -57,8 +57,7 @@ public class PromptSharedRulesService {
         }
 
         String customBlock = "";
-        
-        // Use the passed variable instead of querying the database
+
         if (customInstructions != null && !customInstructions.isBlank()) {
             customBlock = """
                 ═══════════════════════════════════════════════════════════
@@ -72,7 +71,7 @@ public class PromptSharedRulesService {
             You are a strict, expert evaluator of software engineering documents following IEEE standards.
 
             %s
-            
+
             ═══════════════════════════════════════════════════════════
             CORE DIRECTIVE — SUBSTANCE OVER STYLE
             ═══════════════════════════════════════════════════════════
@@ -118,12 +117,58 @@ public class PromptSharedRulesService {
               Then evaluate using YOUR detected type, not the pre-classifier's.
 
             ═══════════════════════════════════════════════════════════
-            STEP 2 — RUBRIC
+            STEP 2 — VISUAL ANALYSIS (diagrams, figures, tables)
+            ═══════════════════════════════════════════════════════════
+            You have been provided with rendered page images of this document labeled as [IMG-1], [IMG-2], etc.
+            For EVERY diagram, figure, or table visible in these [IMG-X] images, you MUST:
+
+            1. IDENTIFY the diagram type precisely:
+               - UML: Class, Use Case, Sequence, Activity, State, Component, Deployment
+               - ERD (Entity-Relationship Diagram)
+               - DFD (Data Flow Diagram)
+               - Flowchart, Architecture Diagram, Network Diagram, or any other type
+
+            2. ANALYZE the technical notation in detail:
+               - Relationships and cardinalities: one-to-one (1:1), one-to-many (1:N),
+                 many-to-many (M:N); crow's foot notation; UML multiplicity (0..*, 1..1, etc.)
+               - UML association types: aggregation (hollow diamond), composition (filled diamond),
+                 inheritance/generalization (hollow triangle arrow), dependency (dashed arrow),
+                 realization (dashed hollow triangle), directed association (filled arrowhead)
+               - Use Case notation: <<include>> (dashed arrow, mandatory), <<extend>> (dashed arrow,
+                 conditional), actor-to-use-case lines, system boundary rectangles
+               - ERD: primary keys (PK), foreign keys (FK), weak entities, identifying relationships
+               - Activity/State: guard conditions in brackets, action labels, fork/join bars,
+                 initial (filled circle) and final (bullseye) nodes
+               - Sequence: lifelines, activation bars, synchronous (filled arrowhead) vs.
+                 asynchronous (open arrowhead) messages, return messages (dashed)
+               - Swimlanes: correct assignment of actions to the responsible actor/system
+
+            3. EVALUATE correctness and completeness:
+               - Are relationship types and cardinalities semantically correct for this domain?
+               - Are notation symbols used correctly per UML 2.x / IEEE / ER standards?
+               - Are there orphaned entities, missing relationships, or broken associations?
+               - Do the diagrams logically align with the written sections of the document?
+               - Are labels, roles, and multiplicity values present where required?
+
+            4. REPORT findings under "Diagram Analysis" in the output.
+               Use this format for each diagram found:
+
+               * [IMG-X] - <Diagram Type>:
+                 - Notation observed: <specific symbols, relationship types, and labels found>
+                 - Correctness: <assessment of whether notation is used properly>
+                 - Issues: <specific errors, missing elements, or inconsistencies>
+                 - Alignment: <whether the diagram matches the written content>
+
+            If no diagrams or figures are detected in the images, output:
+               Diagram Analysis: No diagrams detected in the provided [IMG-X] page visuals.
+
+            ═══════════════════════════════════════════════════════════
+            STEP 3 — RUBRIC
             ═══════════════════════════════════════════════════════════
             %s
 
             ═══════════════════════════════════════════════════════════
-            STEP 3 — SCORING
+            STEP 4 — SCORING
             ═══════════════════════════════════════════════════════════
             Score each rubric criterion using the calibrated scale below.
             Apply the scale uniformly. Do not grade-inflate.
@@ -136,8 +181,8 @@ public class PromptSharedRulesService {
               1 = Absent, incorrect, or contradicts other sections of the document
 
             For each criterion, your justification MUST:
-              (a) Reference a specific section or passage (Evidence rule above)
-              (b) Explain WHY that evidence maps to the assigned score tier
+              (a) Reference a specific section, passage, OR DIAGRAM [IMG-X] (Evidence rule above)
+              (b) Explain WHY that evidence maps to the assigned score tier. IF A DIAGRAM CONTAINS NOTATION ERRORS, YOU MUST LOWER THE SCORE FOR THAT SECTION.
               (c) Match the numeric score to the tier described in your prose
 
             ═══════════════════════════════════════════════════════════
@@ -145,7 +190,7 @@ public class PromptSharedRulesService {
             ═══════════════════════════════════════════════════════════
 
             ═══════════════════════════════════════════════════════════
-            STEP 5 — OUTPUT FORMAT (follow exactly, no deviations)
+            STEP 6 — OUTPUT FORMAT (follow exactly, no deviations)
             ═══════════════════════════════════════════════════════════
 
             Is the Document Empty?: <Yes / No>
@@ -158,12 +203,14 @@ public class PromptSharedRulesService {
 
             %s
 
+            Diagram Analysis:
+            (Populated from STEP 2 above — one entry per [IMG-X] figure/diagram found)
+
             Missing Sections:
             * (IEEE-required sections that are entirely absent from the document)
 
             Weaknesses:
-            * (Sections that exist but lack engineering depth, precision, or logical consistency —
-               2–3 bullet points, specific and evidence-backed)
+            * (Sections that exist but lack engineering depth, precision, or logical consistency. YOU MUST INCLUDE SPECIFIC DIAGRAM/NOTATION ERRORS HERE IF ANY WERE FOUND IN STEP 2)
 
             Recommendations:
             * [<Criterion Name>, <Score>/5] → (specific, granular, actionable fix)

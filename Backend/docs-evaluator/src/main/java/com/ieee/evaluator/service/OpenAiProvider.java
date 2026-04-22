@@ -123,7 +123,7 @@ public class OpenAiProvider implements AiProvider {
                 ));
 
                 Map<String, Object> imageUrl = new HashMap<>();
-                imageUrl.put("url", "data:image/png;base64," + image);
+                imageUrl.put("url", "data:image/jpeg;base64," + image);
                 contentParts.add(Map.of("type", "image_url", "image_url", imageUrl));
                 imageIndex++;
             }

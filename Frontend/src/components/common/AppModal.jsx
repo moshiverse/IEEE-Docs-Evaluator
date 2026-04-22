@@ -4,8 +4,18 @@ function AppModal({ isOpen, title, subtitle, onClose, children, footer, containe
   if (!isOpen) return null;
 
   return (
-    <div className="app-modal__overlay" onClick={onClose}>
-      <div className={`app-modal__container ${containerClassName}`.trim()} onClick={(e) => e.stopPropagation()}>
+    <div 
+      className="app-modal__overlay" 
+      onMouseDown={(e) => {
+        // STRICT CHECK: Only close if the user clicked directly on the dark overlay.
+        // This prevents the modal from closing if you highlight text and release the mouse outside.
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      {/* Notice we removed the onClick stopPropagation here, it is no longer needed! */}
+      <div className={`app-modal__container ${containerClassName}`.trim()}>
         <header className="app-modal__header">
           <div>
             <h2 className="app-modal__title">{title}</h2>

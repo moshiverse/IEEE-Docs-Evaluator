@@ -30,6 +30,7 @@ export function useTeacherDashboard(showToast) {
   const [customRules, setCustomRules] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [aiResult, setAiResult] = useState('');
+  const [aiImages, setAiImages] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const [historyLogs, setHistoryLogs] = useState([]);
@@ -539,6 +540,7 @@ export function useTeacherDashboard(showToast) {
 
     setIsAnalyzing(false);
     setAiResult('');
+    setAiImages([]);
     setCustomRules('');
     setSelectedFile(null);
     setIsAnalyzeOpen(false);
@@ -561,6 +563,7 @@ export function useTeacherDashboard(showToast) {
     try {
       setIsAnalyzing(true);
       setAiResult('');
+      setAiImages([]);
       setCustomRules('');
 
       // --- NEW: Pass customInstructions into analyzeSubmission ---
@@ -578,8 +581,8 @@ export function useTeacherDashboard(showToast) {
       // Ignore stale completions if user switched to another file or closed modal.
       if (!isAnalyzeOpenRef.current || selectedFileRef.current?.id !== fileToAnalyze.id) return;
 
-      const result = data.analysis || data;
-      setAiResult(result);
+      setAiResult(data.analysis);
+      setAiImages(data.images || []); // Store the images in state
 
       // Refresh history in background — must not block or clear the result
       loadHistory().catch(() => {});
@@ -600,8 +603,8 @@ export function useTeacherDashboard(showToast) {
     setSelectedHistoryItem(item);
     setEditedReportText(item.evaluationResult);
     setEditedTeacherFeedback(item.teacherFeedback || '');
+    setAiImages(item.extractedImages || []);
     setIsEditingReport(false);
-    console.log(item);
   }
 
   async function saveEditedHistory() {
@@ -709,6 +712,7 @@ export function useTeacherDashboard(showToast) {
     closeAnalyzeModal,
     selectedFile,
     aiResult,
+    aiImages,
     isAnalyzing,
     selectedHistoryItem,
     isEditingReport,

@@ -215,6 +215,7 @@ function TeacherDashboardPage() {
         isOpen={vm.isAnalyzeOpen}
         file={vm.selectedFile}
         aiResult={vm.aiResult}
+        aiImages={vm.aiImages}
         isAnalyzing={vm.isAnalyzing}
         hasPreviousEvaluation={Boolean(vm.selectedFile?.id && vm.analyzedFileIds?.has(vm.selectedFile.id))}
         aiRuntimeSettings={vm.aiRuntimeSettings}

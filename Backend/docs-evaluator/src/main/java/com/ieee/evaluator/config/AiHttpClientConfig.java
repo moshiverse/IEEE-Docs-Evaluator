@@ -13,8 +13,8 @@ public class AiHttpClientConfig {
     @Primary
     public RestTemplate aiRestTemplate() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(30_000);
-        factory.setReadTimeout(60_000);
+        factory.setConnectTimeout(60_000);
+        factory.setReadTimeout(300_000);
         return new RestTemplate(factory);
     }
 }

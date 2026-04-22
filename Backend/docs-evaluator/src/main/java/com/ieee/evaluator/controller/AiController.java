@@ -21,23 +21,27 @@ public class AiController {
         this.historyRepository = historyRepository;
     }
 
+    /**
+     * Triggers document analysis. 
+     * Now returns a Map containing "analysis" (String) and "images" (List of Base64 Strings).
+     */
     @PostMapping("/analyze")
     public ResponseEntity<?> analyzeFile(@RequestBody Map<String, String> payload) {
         try {
             String fileId = payload.get("fileId") == null ? null : payload.get("fileId").trim();
             String fileName = payload.get("fileName") == null ? null : payload.get("fileName").trim();
             String model = payload.get("model") == null ? null : payload.get("model").trim();
-            
-            // --- NEW: Extract the optional custom instructions from the payload ---
             String customInstructions = payload.get("customInstructions");
             
             if (fileId == null || fileId.isBlank() || model == null || model.isBlank() || fileName == null || fileName.isBlank()) {
                 return ResponseEntity.badRequest().body("Missing fileId, fileName, or model");
             }
             
-            // --- NEW: Pass customInstructions to the AiService ---
-            String result = aiService.analyzeDocument(fileId, fileName, model, customInstructions);
-            return ResponseEntity.ok(Map.of("analysis", result));
+            // This now returns a Map<String, Object> containing both text and images
+            Map<String, Object> result = aiService.analyzeDocument(fileId, fileName, model, customInstructions);
+            
+            // Returns the full payload to the frontend
+            return ResponseEntity.ok(result);
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("error", e.getMessage()));
@@ -106,6 +110,9 @@ public class AiController {
     @GetMapping("/student-reports")
     public ResponseEntity<?> getStudentReports(@RequestParam String groupCode) {
         try {
+            // FIX #5 (note): This filters by fileName LIKE %groupCode%, which is broad.
+            // If file naming isn't strictly controlled, consider adding a dedicated
+            // groupCode column to EvaluationHistory and querying on that instead.
             return ResponseEntity.ok(historyRepository
                 .findByIsSentTrueAndFileNameContainingIgnoreCaseOrderByEvaluatedAtDesc(groupCode));
         } catch (Exception e) {

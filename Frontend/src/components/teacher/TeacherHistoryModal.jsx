@@ -1,3 +1,4 @@
+// File: Frontend/src/components/teacher/TeacherHistoryModal.jsx
 import AppModal from '../common/AppModal';
 import EvaluationReport from '../common/EvaluationReport';
 
@@ -43,13 +44,15 @@ function TeacherHistoryModal({
       footer={footer}
     >
       {isEditing ? (
-        <div className="report-edit-container">
+        // --- ADDED STRICT INLINE SCROLLING HERE ---
+        <div className="report-edit-container" style={{ maxHeight: 'calc(100vh - 220px)', overflowY: 'auto', overflowX: 'hidden', paddingRight: '8px' }}>
           <div className="report-edit-section">
             <label className="report-edit-label">AI Evaluation</label>
             <textarea
               className="report-textarea"
               value={editedText}
               onChange={(e) => onEditText(e.target.value)}
+              style={{ minHeight: '300px' }} // Ensures text area is tall enough to edit comfortably
             />
           </div>
           <div className="report-edit-section">
@@ -59,24 +62,32 @@ function TeacherHistoryModal({
               value={editedFeedback}
               onChange={(e) => onEditFeedback(e.target.value)}
               placeholder="Add your own feedback here..."
+              style={{ minHeight: '150px' }}
             />
           </div>
         </div>
       ) : (
-        <div className="report-view-container">
-          <EvaluationReport text={item?.evaluationResult} />
+        // --- ADDED STRICT INLINE SCROLLING HERE ---
+        <div className="report-view-container" style={{ maxHeight: 'calc(100vh - 220px)', overflowY: 'auto', overflowX: 'hidden', paddingRight: '8px' }}>
+          
+          <EvaluationReport 
+            text={item?.evaluationResult} 
+            images={item?.extractedImages || []} 
+          />
+          
           {hasFeedback && (
-            <div className="eval-card eval-card--feedback">
+            <div className="eval-card eval-card--feedback" style={{ marginTop: '1.5rem' }}>
               <div className="eval-card__header">
-                <span className="eval-card__heading">Teacher Feedback</span>
+                <span className="eval-card__heading" style={{ color: 'var(--text-main)' }}>Teacher Feedback</span>
               </div>
               <div className="eval-card__body">
-                <p className="eval-card__note" style={{ fontStyle: 'normal' }}>
+                <p className="eval-card__note" style={{ fontStyle: 'normal', whiteSpace: 'pre-wrap' }}>
                   {item.teacherFeedback}
                 </p>
               </div>
             </div>
           )}
+          
         </div>
       )}
     </AppModal>
