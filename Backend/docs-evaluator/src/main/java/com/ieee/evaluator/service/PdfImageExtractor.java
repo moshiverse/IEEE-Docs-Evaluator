@@ -23,11 +23,11 @@ public class PdfImageExtractor {
     // 150 DPI was too low for fine diagram labels (<<include>>, multiplicity,
     // crow's foot notation, PK/FK labels). 250 DPI is the minimum for reliable
     // AI vision analysis of technical diagrams.
-    private static final float RENDER_DPI        = 250f;
+    private static final float RENDER_DPI        = 200f;
 
     // JPEG at 0.92 quality is visually lossless for diagrams but ~5x smaller
     // than PNG at 250 DPI, significantly reducing API token usage per page.
-    private static final float JPEG_QUALITY      = 0.92f;
+    private static final float JPEG_QUALITY      = 0.70f;
 
     public List<String> extractFirstPagesAsBase64Pngs(byte[] pdfBytes) throws Exception {
         return extractFirstPagesAsBase64Pngs(pdfBytes, DEFAULT_MAX_PAGES);
