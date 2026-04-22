@@ -10,6 +10,7 @@ function StudentReportModal({ report, onClose }) {
       onClose={onClose}
       title="Professor's Evaluation"
       subtitle={report ? `File: ${report.fileName}` : ''}
+      containerClassName="student-report-modal"
     >
       <div className="report-view-container">
         <EvaluationReport text={report?.evaluationResult} />

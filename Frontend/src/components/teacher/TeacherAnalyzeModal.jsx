@@ -82,6 +82,7 @@ function TeacherAnalyzeModal({
       onClose={onClose}
       title={`Analyze: ${file?.name || ''}`}
       subtitle={subtitle}
+      containerClassName="teacher-analyze-modal"
       footer={footer}
     >
       {!isAnalyzing && !hasResult && (

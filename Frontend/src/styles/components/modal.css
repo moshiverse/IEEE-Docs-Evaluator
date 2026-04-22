@@ -25,6 +25,10 @@
   width: min(980px, 100%);
 }
 
+.app-modal__container.teacher-analyze-modal {
+  width: min(980px, 100%);
+}
+
 .submission-history-modal .app-table {
   table-layout: fixed;
   width: 100%;
@@ -90,6 +94,54 @@
   width: 0;
   height: 0;
   display: none;
+}
+
+.teacher-analyze-modal .app-modal__body {
+  scrollbar-width: thin;
+  -ms-overflow-style: auto;
+}
+
+.teacher-analyze-modal .app-modal__body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  display: block;
+}
+
+.teacher-analyze-modal .app-modal__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.teacher-analyze-modal .app-modal__body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line-strong) 70%, var(--brand));
+}
+
+.teacher-analyze-modal .app-modal__body::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--line-strong) 55%, var(--brand));
+}
+
+.student-report-modal .app-modal__body {
+  scrollbar-width: thin;
+  -ms-overflow-style: auto;
+}
+
+.student-report-modal .app-modal__body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  display: block;
+}
+
+.student-report-modal .app-modal__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.student-report-modal .app-modal__body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line-strong) 70%, var(--brand));
+}
+
+.student-report-modal .app-modal__body::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--line-strong) 55%, var(--brand));
 }
 
 .app-modal__footer {
@@ -342,6 +394,7 @@
 .eval-card__body {
   padding: 0.8rem 1rem;
   background: var(--bg-surface-2);
+  color: var(--text-main);
 }
 
 .eval-card__list {
@@ -432,6 +485,11 @@
 
 .eval-card__subheading:first-child {
   margin-top: 0.2rem;
+}
+
+.eval-card__large-score {
+  color: var(--text-main);
+  font-weight: 700;
 }
 
 /* --- Status Badge Styles --- */
