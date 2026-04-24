@@ -5,6 +5,7 @@ import com.ieee.evaluator.model.EvaluationHistorySummaryDTO;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +19,13 @@ public interface EvaluationHistoryRepository extends JpaRepository<EvaluationHis
            "h.id, h.fileId, h.fileName, h.modelUsed, h.evaluatedAt, h.isSent) " +
            "FROM EvaluationHistory h ORDER BY h.evaluatedAt DESC")
     List<EvaluationHistorySummaryDTO> findAllSummaries();
+
+    @Query("SELECT new com.ieee.evaluator.model.EvaluationHistorySummaryDTO(" +
+       "h.id, h.fileId, h.fileName, h.modelUsed, h.evaluatedAt, h.isSent) " +
+       "FROM EvaluationHistory h " +
+       "WHERE h.isSent = true AND LOWER(h.fileName) LIKE LOWER(CONCAT('%', :groupCode, '%')) " +
+       "ORDER BY h.evaluatedAt DESC")
+    List<EvaluationHistorySummaryDTO> findStudentSummaries(@Param("groupCode") String groupCode);
 
     List<EvaluationHistory> findByIsSentTrueAndFileNameContainingIgnoreCaseOrderByEvaluatedAtDesc(String groupCode);
 

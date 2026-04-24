@@ -6,14 +6,28 @@ import StudentSidebar from '../../components/student/StudentSidebar';
 import { useStudentReports } from '../../hooks/useStudentReports';
 import '../../styles/pages/student-dashboard.css';
 import '../../styles/components/layout.css';
+import { getStudentReportById } from '../../api'
 
 function StudentDashboardPage({ studentData }) {
   const vm = useStudentReports(studentData.groupCode);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
 
-  function handleOpenReport(report) {
-    vm.markViewed(report.id);
-    setSelectedReport(report);
+async function handleOpenReport(reportSummary) {
+    vm.markViewed(reportSummary.id);
+    
+    try {
+      setIsFetchingDetails(true);
+      // Fetch the full report with images
+      const fullReport = await getStudentReportById(reportSummary.id);
+      setSelectedReport(fullReport);
+    } catch (error) {
+      console.error("Failed to load report images", error);
+      // Fallback: show what we have, but images will be missing
+      setSelectedReport(reportSummary); 
+    } finally {
+      setIsFetchingDetails(false);
+    }
   }
 
   return (

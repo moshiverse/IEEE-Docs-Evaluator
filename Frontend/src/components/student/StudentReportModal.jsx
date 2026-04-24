@@ -13,7 +13,10 @@ function StudentReportModal({ report, onClose }) {
       containerClassName="student-report-modal"
     >
       <div className="report-view-container">
-        <EvaluationReport text={report?.evaluationResult} />
+        <EvaluationReport 
+           text={report?.evaluationResult} 
+           images={report?.extractedImages || []} 
+        />
         {hasFeedback && (
           <div className="eval-card eval-card--feedback">
             <div className="eval-card__header">

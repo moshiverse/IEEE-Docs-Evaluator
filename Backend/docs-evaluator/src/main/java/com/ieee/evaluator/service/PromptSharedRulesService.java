@@ -185,6 +185,14 @@ public class PromptSharedRulesService {
               (c) MANDATORY PENALTY: If a diagram is required for a section and contains notation errors (e.g., incorrect UML arrows or missing multiplicities), you MUST deduct at least 4 points from that section.
               (d) Match the numeric score to the tier described in your prose.
 
+            OVERALL SCORE RULE (mandatory):
+            After all 5 criteria are scored, compute the Overall Score by SUMMING all 5 criterion scores.
+            Overall Score = Criterion 1 + Criterion 2 + Criterion 3 + Criterion 4 + Criterion 5
+            Example: 8 + 12 + 12 + 12 + 4 = 48, so Overall Score is 48/100.
+            Do NOT average, estimate, or independently derive the Overall Score.
+            Do NOT write the Overall Score until all 5 criterion scores are finalized.
+            A mismatch between the sum and the stated Overall Score is an evaluation error.
+
             ═══════════════════════════════════════════════════════════
             %s
             ═══════════════════════════════════════════════════════════

@@ -132,3 +132,10 @@ export const getAiRuntimeSettings = async () => {
     if (!response.ok) throw new Error('Failed to fetch AI runtime settings.');
     return await response.json();
 };
+
+export const getStudentReportById = async (id) => {
+    // Reusing the existing history endpoint which returns full details
+    const response = await fetch(`${API_BASE_URL}/ai/history/${id}`);
+    if (!response.ok) throw new Error('Failed to fetch report details.');
+    return await response.json();
+};

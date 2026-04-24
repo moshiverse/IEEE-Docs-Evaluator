@@ -112,8 +112,8 @@ public class AiController {
     @GetMapping("/student-reports")
     public ResponseEntity<?> getStudentReports(@RequestParam String groupCode) {
         try {
-            return ResponseEntity.ok(historyRepository
-                .findByIsSentTrueAndFileNameContainingIgnoreCaseOrderByEvaluatedAtDesc(groupCode));
+            // Use the new safe DTO query
+            return ResponseEntity.ok(historyRepository.findStudentSummaries(groupCode));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
