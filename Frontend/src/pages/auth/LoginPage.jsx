@@ -1,4 +1,6 @@
 import { supabase } from '../../supabaseClient';
+import loginBackground from '../../assets/CIT-U.jpeg';
+import appLogo from '../../assets/logo.png';
 import '../../styles/pages/login.css';
 
 function Login({ authError }) {
@@ -16,7 +18,7 @@ function Login({ authError }) {
   return (
     <div className="login-wrapper">
       {/* Left Side - Image & Marketing Copy */}
-      <div className="login-left">
+      <div className="login-left" style={{ backgroundImage: `url(${loginBackground})` }}>
         <div className="login-left-overlay">
           <div className="secure-badge">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
@@ -31,14 +33,14 @@ function Login({ authError }) {
             
             <div className="features-grid">
               <div className="feature-card">
-                <div className="feature-icon">✨</div>
+                <div className="feature-icon">01</div>
                 <div>
                   <div className="feature-title">Fast Access</div>
                   <div className="feature-desc">Quick sign-in process</div>
                 </div>
               </div>
               <div className="feature-card">
-                <div className="feature-icon">🔒</div>
+                <div className="feature-icon">02</div>
                 <div>
                   <div className="feature-title">Secure</div>
                   <div className="feature-desc">Protected by Google</div>
@@ -53,8 +55,7 @@ function Login({ authError }) {
       <div className="login-right">
         <div className="login-form-container">
           <div className="app-logo-container">
-            <div className="app-logo">✨</div>
-            <div className="logo-dot"></div>
+            <img src={appLogo} alt="IEEE Docs Evaluator logo" className="app-logo-image" />
           </div>
           
           <h2 className="login-title">IEEE Docs Evaluator</h2>
@@ -75,21 +76,21 @@ function Login({ authError }) {
 
           <ul className="benefits-list">
             <li>
-              <span className="benefit-icon purple">🛡️</span>
+              <span className="benefit-icon purple">01</span>
               Google-verified secure authentication
             </li>
             <li>
-              <span className="benefit-icon pink">✨</span>
+              <span className="benefit-icon pink">02</span>
               Access all features instantly
             </li>
             <li>
-              <span className="benefit-icon orange">🔒</span>
+              <span className="benefit-icon orange">03</span>
               Your data is encrypted and protected
             </li>
           </ul>
 
           <p className="terms-text">
-            By continuing, you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+            Sign in with your verified Google account to access your IEEE Docs Evaluator workspace.
           </p>
         </div>
       </div>

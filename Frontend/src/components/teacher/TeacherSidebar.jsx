@@ -1,4 +1,5 @@
 import { signOut } from '../../services/authService';
+import appLogo from '../../assets/logo.png';
 
 const NAV_ITEMS = [
   { key: 'submissions', label: 'Student Submissions' },
@@ -9,7 +10,10 @@ const NAV_ITEMS = [
 function TeacherSidebar({ currentView, onNavigate }) {
   return (
     <aside className="teacher-sidebar">
-      <div className="teacher-sidebar__brand">IEEE Docs Evaluator</div>
+      <div className="teacher-sidebar__brand">
+        <img src={appLogo} alt="IEEE Docs Evaluator logo" className="teacher-sidebar__brand-logo" />
+        <span>IEEE Docs Evaluator</span>
+      </div>
       <p className="teacher-sidebar__caption">Teacher Workspace</p>
 
       <nav className="teacher-sidebar__nav">

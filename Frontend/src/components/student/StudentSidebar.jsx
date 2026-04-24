@@ -1,9 +1,13 @@
 import { signOut } from '../../services/authService';
+import appLogo from '../../assets/logo.png';
 
 function StudentSidebar({ studentData, teamMembers = [] }) {
   return (
     <aside className="student-sidebar">
-      <div className="student-sidebar__brand">IEEE Docs Evaluator</div>
+      <div className="student-sidebar__brand">
+        <img src={appLogo} alt="IEEE Docs Evaluator logo" className="student-sidebar__brand-logo" />
+        <span>IEEE Docs Evaluator</span>
+      </div>
       <p className="student-sidebar__caption">Student Workspace</p>
 
       <div className="student-profile">

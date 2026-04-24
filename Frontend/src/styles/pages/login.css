@@ -14,9 +14,8 @@
 /* Left Side Styling */
 .login-left {
   flex: 1;
-  background-image: url('https://images.unsplash.com/photo-1513258496099-48168024aec0?q=80&w=2000&auto=format&fit=crop'); /* Placeholder library image */
   background-size: cover;
-  background-position: center;
+  background-position: 10% 62%;
   position: relative;
 }
 
@@ -44,6 +43,7 @@
   color: white;
   font-size: 0.9rem;
   width: fit-content;
+  margin-top: -16px;
 }
 
 .hero-text-container {
@@ -53,7 +53,7 @@
 }
 
 .hero-title {
-  font-size: 3.5rem;
+  font-size: calc(3.5rem - 7.5px);
   line-height: 1.2;
   margin-bottom: 20px;
   font-weight: 600;
@@ -109,7 +109,7 @@
 
 .login-form-container {
   width: 100%;
-  max-width: 400px;
+  max-width: 460px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -117,38 +117,35 @@
 
 .app-logo-container {
   position: relative;
-  background: linear-gradient(135deg, #ff4081 0%, #7c4dff 100%);
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
+  background: #ffffff;
+  width: 76px;
+  height: 76px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  margin-bottom: 24px;
+  font-size: 26px;
+  margin-bottom: 28px;
+  border: 1px solid #e2e8f0;
 }
 
-.logo-dot {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 12px;
-  height: 12px;
-  background-color: #4caf50;
-  border-radius: 50%;
-  border: 2px solid #1a1f2e;
+.app-logo-image {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  display: block;
 }
 
 .login-title {
-  font-size: 1.8rem;
-  margin-bottom: 8px;
+  font-size: 2.1rem;
+  margin-bottom: 10px;
   font-weight: 500;
 }
 
 .login-subtitle {
   color: #a0aec0;
-  margin-bottom: 32px;
-  font-size: 0.95rem;
+  margin-bottom: 36px;
+  font-size: 1.02rem;
 }
 
 .google-btn {
@@ -159,11 +156,12 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 14px;
-  border-radius: 8px;
+  padding: 16px;
+  border-radius: 10px;
   font-weight: 500;
-  margin-bottom: 32px;
+  margin-bottom: 36px;
   transition: background-color 0.2s;
+  font-size: 1rem;
 }
 
 .google-btn:hover {
@@ -179,7 +177,7 @@
 .benefits-list {
   list-style: none;
   padding: 0;
-  margin: 0 0 32px 0;
+  margin: 0 0 36px 0;
   width: 100%;
 }
 
@@ -187,8 +185,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
-  font-size: 0.9rem;
+  margin-bottom: 18px;
+  font-size: 0.98rem;
   color: #cbd5e1;
 }
 
@@ -196,10 +194,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
 }
 
 .benefit-icon.purple { background: rgba(124, 77, 255, 0.2); }
@@ -207,9 +205,10 @@
 .benefit-icon.orange { background: rgba(255, 152, 0, 0.2); }
 
 .terms-text {
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   color: #64748b;
   text-align: center;
+  line-height: 1.5;
 }
 
 .terms-text a {

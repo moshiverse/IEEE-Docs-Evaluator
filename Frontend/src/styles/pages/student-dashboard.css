@@ -10,8 +10,18 @@
 }
 
 .student-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 1.05rem;
   font-weight: 800;
+}
+
+.student-sidebar__brand-logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  display: block;
 }
 
 .student-sidebar__caption {
