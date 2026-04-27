@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from './supabaseClient';
-import { verifyStudentWithBackend } from './api'; 
+import { verifyStudentWithBackend } from './api';
 import Login from './pages/auth/LoginPage';
 import Home from './Home';
 import TeacherDashboard from './pages/teacher/TeacherDashboardPage';
@@ -11,48 +11,72 @@ function App() {
   const [authError, setAuthError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
-  // A ref is always current inside the onAuthStateChange closure,
-  // unlike state which gets captured at the time the effect runs.
   const isVerifiedRef = useRef(false);
+  const pendingErrorRef = useRef(''); // holds error across the SIGNED_OUT event
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      
+
       if (event === 'SIGNED_IN' && currentSession) {
 
-        // isVerifiedRef.current is always the latest value — no stale closure.
-        // If already verified, Supabase is just silently refreshing the JWT
-        // on tab focus. Do nothing so the dashboard is never unmounted.
         if (isVerifiedRef.current) return;
 
-        setIsVerifying(true);
+        // If we're returning to login after a failed attempt, clear pending error
+        pendingErrorRef.current = '';
         setAuthError('');
-        
+        setIsVerifying(true);
+
         try {
-          const googleEmail = currentSession.user.email; 
+          const googleEmail = currentSession.user.email;
           const data = await verifyStudentWithBackend(googleEmail);
-          isVerifiedRef.current = true;  // mark verified before setting state
-          setStudentData(data); 
+          isVerifiedRef.current = true;
+          setStudentData(data);
         } catch (error) {
-          console.error("Verification failed:", error);
-          setAuthError(error.message);
+          console.error('Verification failed:', error);
+
+          const msg = error.message || '';
+          const isUnauthorized =
+            msg.includes('403') ||
+            msg.toLowerCase().includes('unauthorized') ||
+            msg.toLowerCase().includes('not on the class') ||
+            msg.toLowerCase().includes('forbidden') ||
+            msg.toLowerCase().includes('access denied');
+
+          const errorToShow = isUnauthorized
+            ? 'Unauthorized: Your Google account is not on the Class Allowlist. Please contact your professor.'
+            : msg || 'An unexpected error occurred. Please try again.';
+
+          // Store in ref BEFORE signing out — the SIGNED_OUT handler will restore it
+          pendingErrorRef.current = errorToShow;
           isVerifiedRef.current = false;
+
           await supabase.auth.signOut();
+          // After signOut resolves, the SIGNED_OUT event has already fired.
+          // Restore the error now.
           setStudentData(null);
+          setAuthError(errorToShow);
+
         } finally {
           setIsVerifying(false);
         }
 
       } else if (event === 'SIGNED_OUT') {
-        // Reset everything on explicit sign out
         isVerifiedRef.current = false;
         setStudentData(null);
-        setAuthError('');
+
+        if (pendingErrorRef.current) {
+          // Restore the pending error — do NOT clear it
+          setAuthError(pendingErrorRef.current);
+          // Don't reset pendingErrorRef here; let the next SIGNED_IN clear it
+        } else {
+          // Normal manual sign-out: clear everything
+          setAuthError('');
+        }
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []); // empty dep array is correct — the ref keeps the closure fresh
+  }, []);
 
   if (isVerifying) {
     return (

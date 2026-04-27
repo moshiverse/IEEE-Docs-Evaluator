@@ -418,3 +418,114 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Validation banner */
+.ssp-validation-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 0.85rem;
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #b45309 14%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, #b45309 35%, var(--line-soft));
+  color: #d97706;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  animation: ssp-fade-in 0.2s ease;
+}
+
+.ssp-validation-banner svg {
+  stroke: #d97706;
+  margin-top: 1px;
+}
+
+/* ── Field-level error  */
+.ssp-field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 0.8rem;
+  color: #ef4444;
+  line-height: 1.4;
+  margin-top: 2px;
+  animation: ssp-fade-in 0.18s ease;
+}
+
+.ssp-field-error svg {
+  stroke: #ef4444;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+/* ── Error state on inputs */
+.ssp-input--error,
+.ssp-select--error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #ef4444 20%, transparent);
+}
+
+.ssp-input--error:focus,
+.ssp-select--error:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, #ef4444 28%, transparent);
+}
+
+/* ── Required badge */
+.ssp-required-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, #ef4444 14%, var(--bg-surface));
+  color: #ef4444;
+  border: 1px solid color-mix(in srgb, #ef4444 28%, var(--line-soft));
+  vertical-align: middle;
+}
+
+/* ── Key status row  */
+.ssp-key-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ssp-key-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.ssp-key-status-pill--ok {
+  background: color-mix(in srgb, #16a34a 14%, var(--bg-surface));
+  color: #16a34a;
+  border: 1px solid color-mix(in srgb, #16a34a 28%, var(--line-soft));
+}
+
+.ssp-key-status-pill--missing {
+  background: color-mix(in srgb, #ef4444 12%, var(--bg-surface));
+  color: #ef4444;
+  border: 1px solid color-mix(in srgb, #ef4444 25%, var(--line-soft));
+}
+
+.ssp-key-status-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+/* ── Animation  */
+@keyframes ssp-fade-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
