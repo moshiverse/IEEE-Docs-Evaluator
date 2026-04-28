@@ -383,3 +383,41 @@
     justify-content: flex-end;
   }
 }
+
+/* Layout for Label and "View Default" button */
+.pw-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.2rem;
+}
+
+/* Link-style button for toggling */
+.pw-btn--link {
+  background: none;
+  border: none;
+  color: var(--brand);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* Expanded box for long backend text */
+.pw-hint-container--expanded {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--line-soft);
+  border-left: 4px solid var(--brand);
+  padding: 1rem;
+  margin: 0.5rem 0 1rem;
+  border-radius: 10px;
+  max-height: 250px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--text-main);
+}

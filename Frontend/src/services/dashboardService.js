@@ -101,10 +101,6 @@ export async function restoreSubmission(fileId) {
   return restoreSubmissionApi(fileId);
 }
 
-export async function fetchPromptTemplates() {
-  return getPromptTemplates();
-}
-
 export async function clearAllHistory() {
   return clearAllEvaluationHistory();
 }
