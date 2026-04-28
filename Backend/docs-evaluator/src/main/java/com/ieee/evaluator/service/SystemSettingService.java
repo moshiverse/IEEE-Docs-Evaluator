@@ -17,21 +17,16 @@ public class SystemSettingService {
 
     public static final String ACTIVE_AI_PROVIDER = "ACTIVE_AI_PROVIDER";
     public static final String OPENAI_MODEL = "OPENAI_MODEL";
-    public static final String GEMINI_MODEL = "GEMINI_MODEL";
     public static final String OPENAI_API_KEY = "OPENAI_API_KEY";
-    public static final String GEMINI_API_KEY = "GEMINI_API_KEY";
 
     public static final Set<String> AI_ALLOWED_UPDATE_KEYS = Set.of(
         ACTIVE_AI_PROVIDER,
         OPENAI_MODEL,
-        GEMINI_MODEL,
-        OPENAI_API_KEY,
-        GEMINI_API_KEY
+        OPENAI_API_KEY
     );
 
     private static final Set<String> SENSITIVE_KEYS = Set.of(
-        OPENAI_API_KEY,
-        GEMINI_API_KEY
+        OPENAI_API_KEY
     );
 
     private final SystemSettingRepository repository;
@@ -120,9 +115,7 @@ public class SystemSettingService {
         errors.addAll(validationService.validateEffectiveSettings(
             effectiveValues.get(ACTIVE_AI_PROVIDER),
             effectiveValues.get(OPENAI_API_KEY),
-            effectiveValues.get(OPENAI_MODEL),
-            effectiveValues.get(GEMINI_API_KEY),
-            effectiveValues.get(GEMINI_MODEL)
+            effectiveValues.get(OPENAI_MODEL)
         ));
 
         if (!errors.isEmpty()) {
@@ -179,9 +172,7 @@ public class SystemSettingService {
         return switch (key.toUpperCase(Locale.ROOT)) {
             case ACTIVE_AI_PROVIDER -> "Active provider used for AI analysis";
             case OPENAI_MODEL -> "Active OpenAI model";
-            case GEMINI_MODEL -> "Active Gemini model";
             case OPENAI_API_KEY -> "OpenAI API key";
-            case GEMINI_API_KEY -> "Gemini API key";
             default -> "AI setting";
         };
     }
