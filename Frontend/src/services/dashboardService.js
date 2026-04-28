@@ -12,7 +12,17 @@ import {
   updateMultipleSystemSettings,
   updateEvaluationResult,
   updateSystemSetting,
+  deleteEvaluationReport,
+  restoreEvaluationReport,
+  getHiddenSubmissionIds,
+  hideSubmission as hideSubmissionApi,
+  restoreSubmission as restoreSubmissionApi,
+  getPromptTemplates,
 } from '../api';
+
+export async function fetchPromptTemplates() {
+  return getPromptTemplates();
+}
 
 export async function fetchStudentReports(groupCode) {
   return getStudentReports(groupCode);
@@ -68,4 +78,28 @@ export async function fetchHistoryItem(id) {
         throw new Error(`Server Error: ${errorText}`);
     }
     return res.json();
+}
+
+export async function softDeleteReport(id) {
+  return deleteEvaluationReport(id);
+}
+
+export async function restoreReport(id) {
+  return restoreEvaluationReport(id);
+}
+
+export async function fetchHiddenSubmissionIds() {
+  return getHiddenSubmissionIds();
+}
+
+export async function hideSubmission(fileId) {
+  return hideSubmissionApi(fileId);
+}
+
+export async function restoreSubmission(fileId) {
+  return restoreSubmissionApi(fileId);
+}
+
+export async function fetchPromptTemplates() {
+  return getPromptTemplates();
 }

@@ -18,21 +18,19 @@ import java.util.List;
 @Service
 public class PdfImageExtractor {
 
-    private static final int   DEFAULT_MAX_PAGES = 10;
+    // ── Fallback constants — used when DB settings are missing or invalid ─────
+    private static final int   FALLBACK_MAX_PAGES    = 999;
+    private static final float FALLBACK_RENDER_DPI   = 300f;
+    private static final float FALLBACK_JPEG_QUALITY = 1f;
 
-    // 150 DPI was too low for fine diagram labels (<<include>>, multiplicity,
-    // crow's foot notation, PK/FK labels). 250 DPI is the minimum for reliable
-    // AI vision analysis of technical diagrams.
-    private static final float RENDER_DPI        = 300f;
+    private final SystemSettingService settingsService;
 
-    // JPEG at 0.85 quality balances artifact-free line art (critical for UML/ERD
-    // notation) with payload reduction (~35% smaller than 0.92). Below 0.80,
-    // blocking artifacts on thin diagram edges and small labels are likely to
-    // degrade model accuracy on fine notation.
-    private static final float JPEG_QUALITY      = 1f;
+    public PdfImageExtractor(SystemSettingService settingsService) {
+        this.settingsService = settingsService;
+    }
 
     public List<String> extractFirstPagesAsBase64Pngs(byte[] pdfBytes) throws Exception {
-        return extractFirstPagesAsBase64Pngs(pdfBytes, DEFAULT_MAX_PAGES);
+        return extractFirstPagesAsBase64Pngs(pdfBytes, readMaxPages());
     }
 
     public List<String> extractFirstPagesAsBase64Pngs(byte[] pdfBytes, int maxPages) throws Exception {
@@ -40,27 +38,62 @@ public class PdfImageExtractor {
             return List.of();
         }
 
+        float renderDpi   = readRenderDpi();
+        float jpegQuality = readJpegQuality();
+
         List<String> images = new ArrayList<>();
 
         try (PDDocument document = PDDocument.load(pdfBytes)) {
-            PDFRenderer renderer = new PDFRenderer(document);
-            int pagesToRender = Math.min(Math.max(maxPages, 0), document.getNumberOfPages());
+            PDFRenderer renderer     = new PDFRenderer(document);
+            int         pagesToRender = Math.min(Math.max(maxPages, 0), document.getNumberOfPages());
 
             for (int pageIndex = 0; pageIndex < pagesToRender; pageIndex++) {
-                BufferedImage image = renderer.renderImageWithDPI(pageIndex, RENDER_DPI);
-
-                // Convert to RGB — JPEG does not support alpha channels (ARGB).
-                // PDFBox may return ARGB images; writing ARGB directly as JPEG
-                // produces a corrupted or magenta-tinted image.
+                BufferedImage image    = renderer.renderImageWithDPI(pageIndex, renderDpi);
                 BufferedImage rgbImage = toRgb(image);
-
-                byte[] jpegBytes = encodeAsJpeg(rgbImage, JPEG_QUALITY);
+                byte[]        jpegBytes = encodeAsJpeg(rgbImage, jpegQuality);
                 images.add(Base64.getEncoder().encodeToString(jpegBytes));
             }
         }
 
         return images;
     }
+
+    // ── DB setting readers — each falls back gracefully ───────────────────────
+
+    private int readMaxPages() {
+        try {
+            String val = settingsService.getValueOrNull("RENDER_MAX_PAGES");
+            if (val != null && !val.isBlank()) {
+                int parsed = Integer.parseInt(val.trim());
+                if (parsed > 0) return parsed;
+            }
+        } catch (Exception ignored) {}
+        return FALLBACK_MAX_PAGES;
+    }
+
+    private float readRenderDpi() {
+        try {
+            String val = settingsService.getValueOrNull("RENDER_DPI");
+            if (val != null && !val.isBlank()) {
+                float parsed = Float.parseFloat(val.trim());
+                if (parsed >= 72f && parsed <= 600f) return parsed;
+            }
+        } catch (Exception ignored) {}
+        return FALLBACK_RENDER_DPI;
+    }
+
+    private float readJpegQuality() {
+        try {
+            String val = settingsService.getValueOrNull("RENDER_JPEG_QUALITY");
+            if (val != null && !val.isBlank()) {
+                float parsed = Float.parseFloat(val.trim());
+                if (parsed >= 0.1f && parsed <= 1.0f) return parsed;
+            }
+        } catch (Exception ignored) {}
+        return FALLBACK_JPEG_QUALITY;
+    }
+
+    // ── Image helpers ─────────────────────────────────────────────────────────
 
     /**
      * Converts any BufferedImage to TYPE_INT_RGB, which is required for JPEG encoding.
@@ -81,13 +114,13 @@ public class PdfImageExtractor {
      * since ImageIO.write() does not expose quality settings.
      */
     private byte[] encodeAsJpeg(BufferedImage image, float quality) throws Exception {
-        ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
+        ImageWriter    writer = ImageIO.getImageWritersByFormatName("jpeg").next();
         ImageWriteParam param = writer.getDefaultWriteParam();
         param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
         param.setCompressionQuality(quality);
 
         try (ByteArrayOutputStream out = new ByteArrayOutputStream();
-             ImageOutputStream ios = ImageIO.createImageOutputStream(out)) {
+             ImageOutputStream ios    = ImageIO.createImageOutputStream(out)) {
             writer.setOutput(ios);
             writer.write(null, new IIOImage(image, null, null), param);
             return out.toByteArray();

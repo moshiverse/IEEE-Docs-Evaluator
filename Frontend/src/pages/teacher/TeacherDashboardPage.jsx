@@ -9,6 +9,7 @@ import TeacherHistoryTable from '../../components/teacher/TeacherHistoryTable';
 import TeacherSettingsPanel from '../../components/teacher/TeacherSettingsPanel';
 import TeacherSidebar from '../../components/teacher/TeacherSidebar';
 import TeacherSubmissionsTable from '../../components/teacher/TeacherSubmissionsTable';
+import ProfessorWorkspacePage from './ProfessorWorkspacePage';
 import { useTeacherDashboard } from '../../hooks/useTeacherDashboard';
 import { useTheme } from '../../hooks/useTheme';
 import { useToast } from '../../hooks/useToast';
@@ -25,7 +26,6 @@ function TeacherDashboardPage() {
 
   const submissionHistoryLogs = useMemo(() => {
     if (!submissionHistoryFile?.id) return [];
-
     return vm.historyLogs
       .filter((log) => log.fileId === submissionHistoryFile.id)
       .sort((a, b) => new Date(b.evaluatedAt) - new Date(a.evaluatedAt));
@@ -33,7 +33,6 @@ function TeacherDashboardPage() {
 
   function openSubmissionHistoryModal() {
     if (!vm.selectedFile?.id) return;
-
     vm.clearReportFilters();
     vm.closeAnalyzeModal();
     setSubmissionHistoryFile(vm.selectedFile);
@@ -52,7 +51,6 @@ function TeacherDashboardPage() {
       closeSubmissionHistoryModal();
       return;
     }
-
     setIsSubmissionHistoryOpen(false);
     vm.openAnalyzeModal(submissionHistoryFile);
   }
@@ -64,12 +62,10 @@ function TeacherDashboardPage() {
 
   function handleHistoryDetailsClose() {
     vm.closeHistoryModal();
-
     if (isSubmissionHistoryFlow && submissionHistoryFile?.id) {
       setIsSubmissionHistoryOpen(true);
       return;
     }
-
     setIsSubmissionHistoryFlow(false);
   }
 
@@ -85,6 +81,7 @@ function TeacherDashboardPage() {
       <main className="layout__main">
         {vm.error && <div className="error-box">{vm.error}</div>}
 
+        {/* ── Submissions ─────────────────────────────────────────────────── */}
         {vm.currentView === 'submissions' && (
           <>
             <PanelHeader
@@ -130,6 +127,7 @@ function TeacherDashboardPage() {
           </>
         )}
 
+        {/* ── Reports ─────────────────────────────────────────────────────── */}
         {vm.currentView === 'reports' && (
           <>
             <PanelHeader
@@ -151,7 +149,6 @@ function TeacherDashboardPage() {
                 </div>
               }
             />
-
             <TeacherFilterPanel
               sections={vm.reportFilterOptions.sections}
               teamCodes={vm.reportFilterOptions.teamCodes}
@@ -171,7 +168,6 @@ function TeacherDashboardPage() {
               onStatusChange={vm.setReportStatusFilter}
               onClear={vm.clearReportFilters}
             />
-
             <TeacherHistoryTable
               logs={vm.historyLogs}
               allCount={vm.allHistoryCount}
@@ -182,6 +178,12 @@ function TeacherDashboardPage() {
           </>
         )}
 
+        {/* ── Professor Workspace ──────────────────────────────────────────── */}
+        {vm.currentView === 'workspace' && (
+          <ProfessorWorkspacePage />
+        )}
+
+        {/* ── System Settings ──────────────────────────────────────────────── */}
         {vm.currentView === 'settings' && (
           <>
             <PanelHeader
@@ -203,13 +205,13 @@ function TeacherDashboardPage() {
               trashBinSummary={vm.trashBinSummary}
               onSafeEmptyAllTrashBins={vm.safeEmptyAllTrashBins}
               onRestoreSelectedTrashItems={vm.restoreSelectedTrashItems}
-              onDiscard={() => {
-                vm.loadSettings();
-              }}
+              onDiscard={() => { vm.loadSettings(); }}
             />
           </>
         )}
       </main>
+
+      {/* ── Modals ───────────────────────────────────────────────────────── */}
 
       <TeacherAnalyzeModal
         isOpen={vm.isAnalyzeOpen}
@@ -219,11 +221,12 @@ function TeacherDashboardPage() {
         isAnalyzing={vm.isAnalyzing}
         hasPreviousEvaluation={Boolean(vm.selectedFile?.id && vm.analyzedFileIds?.has(vm.selectedFile.id))}
         aiRuntimeSettings={vm.aiRuntimeSettings}
-        customRules={vm.customRules} 
+        customRules={vm.customRules}
         setCustomRules={vm.setCustomRules}
         onClose={vm.closeAnalyzeModal}
         onRun={vm.runAnalysis}
         onViewHistory={openSubmissionHistoryModal}
+        promptTemplates={vm.promptTemplates}
       />
 
       <TeacherSubmissionHistoryModal

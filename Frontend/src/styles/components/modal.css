@@ -671,3 +671,37 @@
 .app-modal__body::-webkit-scrollbar-thumb:hover {
   background-color: var(--text-muted, #94a3b8); 
 }
+
+/* ── Template selector in TeacherAnalyzeModal ────────────────────────────── */
+.custom-rules-select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.72rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  background-color: var(--bg-surface-2);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 0.35rem;
+}
+
+.custom-rules-select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--brand) 55%, var(--line-soft));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--glow) 38%, transparent);
+  background-color: var(--bg-surface);
+}
+
+.custom-rules-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+[data-theme='dark'] .custom-rules-select {
+  background-color: var(--bg-surface-2);
+  color: var(--text-main);
+  border-color: var(--line-soft);
+}

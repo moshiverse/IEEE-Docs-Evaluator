@@ -22,21 +22,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class AiService {
 
-    private static final String KEY_ACTIVE_PROVIDER          = "ACTIVE_AI_PROVIDER";
-    private static final String DEFAULT_PROVIDER             = "openai";
-    private static final int    MAX_PAGES_TO_RENDER          = 999;
+    private static final String KEY_ACTIVE_PROVIDER           = "ACTIVE_AI_PROVIDER";
+    private static final String DEFAULT_PROVIDER              = "openai";
+    private static final int    MAX_PAGES_TO_RENDER           = 999;
     private static final long   RECENT_HISTORY_WINDOW_SECONDS = 120;
-    private static final int    ANALYZE_MAX_ATTEMPTS         = 8;
-    private static final long   RETRY_INITIAL_DELAY_MIN_MS   = 2_000;
-    private static final long   RETRY_INITIAL_DELAY_MAX_MS   = 5_000;
-    private static final long   RETRY_BACKOFF_MAX_DELAY_MS   = 30_000;
-    private static final long   RETRY_TIME_LIMIT_MS          = 180_000;
+    private static final int    ANALYZE_MAX_ATTEMPTS          = 8;
+    private static final long   RETRY_INITIAL_DELAY_MIN_MS    = 2_000;
+    private static final long   RETRY_INITIAL_DELAY_MAX_MS    = 5_000;
+    private static final long   RETRY_BACKOFF_MAX_DELAY_MS    = 30_000;
+    private static final long   RETRY_TIME_LIMIT_MS           = 180_000;
 
-    private final GoogleDocsService            docsService;
-    private final EvaluationHistoryRepository  historyRepository;
-    private final SystemSettingService         settingsService;
-    private final Map<String, AiProvider>      providers;
-    private final Set<String>                  inFlightAnalyses = ConcurrentHashMap.newKeySet();
+    private final GoogleDocsService           docsService;
+    private final EvaluationHistoryRepository historyRepository;
+    private final SystemSettingService        settingsService;
+    private final Map<String, AiProvider>     providers;
+    private final Set<String>                 inFlightAnalyses = ConcurrentHashMap.newKeySet();
 
     public AiService(
             GoogleDocsService docsService,
@@ -60,21 +60,14 @@ public class AiService {
     public EvaluationHistory getFullHistoryItem(Long id) {
         EvaluationHistory history = historyRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Evaluation record not found"));
-        
-        // Explicitly initialize the lazy collection while inside the transaction
         if (history.getExtractedImages() != null) {
-            history.getExtractedImages().size(); 
+            history.getExtractedImages().size();
         }
-        
         return history;
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    /**
-     * Analyzes a document and returns an AnalysisResultDTO containing the
-     * "analysis" text and the "images" list extracted from the document.
-     */
     public AnalysisResultDTO analyzeDocument(
             String fileId, String fileName, String aiModel, String customInstructions) throws Exception {
 
@@ -173,14 +166,90 @@ public class AiService {
             );
         }
 
-        String previousEvaluation = historyRepository
+        // Pass a structured findings summary instead of the full previous evaluation text.
+        // This keeps token usage flat regardless of how many revision cycles have occurred.
+        String previousFindings = historyRepository
                 .findTopByFileIdOrderByEvaluatedAtDesc(fileId)
-                .map(EvaluationHistory::getEvaluationResult)
+                .map(prev -> extractFindingsSummary(prev.getEvaluationResult()))
                 .orElse(null);
 
-        String analysis = provider.analyze(docData.text(), docData.images(), previousEvaluation, customInstructions);
+        String analysis = provider.analyze(docData.text(), docData.images(), previousFindings, customInstructions);
 
         return new AnalysisResultDTO(analysis, docData.images());
+    }
+
+    // ── Structured findings summary ───────────────────────────────────────────
+
+    /**
+     * Extracts a compact findings summary from a previous evaluation result.
+     *
+     * Pulls only the sections that matter for revision comparison:
+     * Overall Score, Weaknesses, Missing Sections, and Recommendations.
+     * Everything else (full rubric justifications, diagram analysis, strengths)
+     * is omitted to keep the token footprint flat across revision cycles.
+     *
+     * Returns null if the text is blank, signalling "first evaluation".
+     */
+    private String extractFindingsSummary(String fullEvaluation) {
+        if (fullEvaluation == null || fullEvaluation.isBlank()) return null;
+
+        StringBuilder summary = new StringBuilder();
+        summary.append("=== PREVIOUS EVALUATION FINDINGS SUMMARY ===\n\n");
+
+        appendSection(summary, fullEvaluation, "Overall Score");
+        appendSection(summary, fullEvaluation, "Missing Sections");
+        appendSection(summary, fullEvaluation, "Weaknesses");
+        appendSection(summary, fullEvaluation, "Recommendations");
+
+        String result = summary.toString().trim();
+        return result.isBlank() ? fullEvaluation : result;
+    }
+
+    /**
+     * Finds a named section in the evaluation text and appends it to the summary builder.
+     * Stops at the next section header or end of string.
+     */
+    private void appendSection(StringBuilder out, String text, String sectionName) {
+        int start = findSectionStart(text, sectionName);
+        if (start == -1) return;
+
+        int end = findNextSectionStart(text, start + sectionName.length());
+        String content = end == -1
+            ? text.substring(start).trim()
+            : text.substring(start, end).trim();
+
+        if (!content.isBlank()) {
+            out.append(content).append("\n\n");
+        }
+    }
+
+    private int findSectionStart(String text, String sectionName) {
+        // Match section headings regardless of surrounding markdown (**, ##, etc.)
+        String lower  = text.toLowerCase();
+        String target = sectionName.toLowerCase();
+        int idx = lower.indexOf(target);
+        if (idx == -1) return -1;
+        // Walk back to start of line
+        while (idx > 0 && text.charAt(idx - 1) != '\n') idx--;
+        return idx;
+    }
+
+    private int findNextSectionStart(String text, int fromIndex) {
+        // Known section headers used in the output format
+        String[] headers = {
+            "Diagram Analysis", "Missing Sections", "Weaknesses",
+            "Recommendations", "Strengths", "Summary", "Conclusion",
+            "Rubric Evaluation", "Revision Analysis"
+        };
+        int earliest = -1;
+        String lower = text.toLowerCase();
+        for (String header : headers) {
+            int idx = lower.indexOf(header.toLowerCase(), fromIndex);
+            if (idx != -1 && (earliest == -1 || idx < earliest)) {
+                earliest = idx;
+            }
+        }
+        return earliest;
     }
 
     // ── Provider resolution ───────────────────────────────────────────────────
@@ -229,11 +298,13 @@ public class AiService {
 
     private void persistHistory(String fileId, String fileName, String modelUsed, String result, List<String> images) {
         try {
-            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime now     = LocalDateTime.now();
             EvaluationHistory history = historyRepository
                 .findTopByFileIdAndModelUsedOrderByEvaluatedAtDesc(fileId, modelUsed)
                 .filter(existing -> isRecent(existing.getEvaluatedAt(), now))
                 .orElseGet(EvaluationHistory::new);
+
+            boolean isNew = history.getId() == null;
 
             history.setFileId(fileId);
             history.setFileName(fileName);
@@ -242,12 +313,19 @@ public class AiService {
             history.setEvaluatedAt(now);
             history.setExtractedImages(images);
 
-            if (history.getId() == null) {
+            if (isNew) {
                 history.setIsSent(false);
                 history.setTeacherFeedback(null);
+                history.setIsDeleted(false);
+
+                // Compute next version: max existing version for this fileId + 1
+                int maxVersion = historyRepository.findMaxVersionByFileId(fileId);
+                history.setVersion(maxVersion + 1);
             }
 
             historyRepository.save(history);
+
+            log.info("Persisted evaluation for fileId={} version={}", fileId, history.getVersion());
         } catch (Exception e) {
             log.error("Failed to persist evaluation history for fileId={}: {}", fileId, e.getMessage(), e);
         }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { supabase } from '../supabaseClient';
 import { fetchClassRoster, fetchStudentReports } from '../services/dashboardService';
 import { extractSubmissionMeta } from '../utils/dashboardUtils';
 
@@ -43,6 +44,41 @@ export function useStudentReports(groupCode) {
       .catch(() => {});
   }, [groupCode]);
 
+  // ── Real-time subscription ────────────────────────────────────────────────
+  // When the professor hits Send Result, the student sees the new evaluation
+  // appear without clicking Check for Updates.
+
+  useEffect(() => {
+    if (!groupCode) return;
+
+    const channel = supabase
+      .channel(`student-reports-${groupCode}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'evaluation_history',
+          // Only fire when is_sent flips to true — avoids unnecessary reloads
+          filter: 'is_sent=eq.true',
+        },
+        (payload) => {
+          const fileName = payload.new?.file_name || '';
+          // Only reload if this update is relevant to this student's group code
+          if (fileName.toLowerCase().includes(groupCode.toLowerCase())) {
+            loadReports();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [groupCode, loadReports]);
+
+  // ── Viewed tracking ───────────────────────────────────────────────────────
+
   function markViewed(id) {
     setViewedIds((prev) => {
       if (prev.includes(id)) return prev;
@@ -51,6 +87,8 @@ export function useStudentReports(groupCode) {
       return next;
     });
   }
+
+  // ── Filtering ─────────────────────────────────────────────────────────────
 
   const filteredReports = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();

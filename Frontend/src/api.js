@@ -139,3 +139,91 @@ export const getStudentReportById = async (id) => {
     if (!response.ok) throw new Error('Failed to fetch report details.');
     return await response.json();
 };
+
+// ── Prompt Templates ──────────────────────────────────────────────────────────
+
+export const getPromptTemplates = async () => {
+    const response = await fetch(`${API_BASE_URL}/professor/prompt-templates`);
+    if (!response.ok) throw new Error('Failed to fetch prompt templates.');
+    return await response.json();
+};
+
+export const createPromptTemplate = async (name, content) => {
+    const response = await fetch(`${API_BASE_URL}/professor/prompt-templates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, content }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to create template.');
+    return data;
+};
+
+export const updatePromptTemplate = async (id, name, content) => {
+    const response = await fetch(`${API_BASE_URL}/professor/prompt-templates/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, content }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to update template.');
+    return data;
+};
+
+export const deletePromptTemplate = async (id) => {
+    const response = await fetch(`${API_BASE_URL}/professor/prompt-templates/${id}`, {
+        method: 'DELETE',
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to delete template.');
+    return data;
+};
+
+// ── Soft delete / restore AI reports ─────────────────────────────────────────
+
+export const deleteEvaluationReport = async (id) => {
+    const response = await fetch(`${API_BASE_URL}/ai/history/${id}`, {
+        method: 'DELETE',
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to delete report.');
+    return data;
+};
+
+export const restoreEvaluationReport = async (id) => {
+    const response = await fetch(`${API_BASE_URL}/ai/history/${id}/restore`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to restore report.');
+    return data;
+};
+
+// ── Hidden submissions ────────────────────────────────────────────────────────
+
+export const getHiddenSubmissionIds = async () => {
+    const response = await fetch(`${API_BASE_URL}/submissions/hidden`);
+    if (!response.ok) throw new Error('Failed to fetch hidden submissions.');
+    return await response.json(); // returns string[]
+};
+
+export const hideSubmission = async (fileId) => {
+    const response = await fetch(`${API_BASE_URL}/submissions/hidden`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to hide submission.');
+    return data;
+};
+
+export const restoreSubmission = async (fileId) => {
+    const response = await fetch(`${API_BASE_URL}/submissions/hidden/${encodeURIComponent(fileId)}`, {
+        method: 'DELETE',
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to restore submission.');
+    return data;
+};

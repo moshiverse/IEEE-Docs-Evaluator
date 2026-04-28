@@ -5,7 +5,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class PromptSharedRulesService {
 
-    public String buildPrompt(DocumentType detectedType, String rubricSection, String documentContent, String previousEvaluation, String customInstructions) {
+    public String buildPrompt(
+            DocumentType detectedType,
+            String rubricSection,
+            String diagramSection,
+            String classContext,
+            String documentContent,
+            String previousEvaluation,
+            String customInstructions) {
 
         String revisionStep;
         String revisionFormat;
@@ -57,7 +64,6 @@ public class PromptSharedRulesService {
         }
 
         String customBlock = "";
-
         if (customInstructions != null && !customInstructions.isBlank()) {
             customBlock = """
                 ═══════════════════════════════════════════════════════════
@@ -65,6 +71,16 @@ public class PromptSharedRulesService {
                 ═══════════════════════════════════════════════════════════
                 %s
                 """.formatted(customInstructions.trim());
+        }
+
+        String classContextBlock = "";
+        if (classContext != null && !classContext.isBlank()) {
+            classContextBlock = """
+                ═══════════════════════════════════════════════════════════
+                CLASS CONTEXT (background — use to inform your evaluation)
+                ═══════════════════════════════════════════════════════════
+                %s
+                """.formatted(classContext.trim());
         }
 
         return """
@@ -91,6 +107,8 @@ public class PromptSharedRulesService {
             When justifying any score, you MUST anchor it to the document with a direct quote
             or close paraphrase. Format: (Evidence: "...excerpt or paraphrase...")
             Do not make claims about the document that you cannot support with a specific reference.
+
+            %s
 
             ═══════════════════════════════════════════════════════════
             STEP 0 — GUARD CHECK
@@ -119,47 +137,7 @@ public class PromptSharedRulesService {
             ═══════════════════════════════════════════════════════════
             STEP 2 — VISUAL ANALYSIS (diagrams, figures, tables)
             ═══════════════════════════════════════════════════════════
-            You have been provided with rendered page images of this document labeled as [IMG-1], [IMG-2], etc.
-            For EVERY diagram, figure, or table visible in these images, you MUST:
-
-            1. IDENTIFY the diagram type precisely:
-               - UML: Class, Use Case, Sequence, Activity, State, Component, Deployment
-               - ERD (Entity-Relationship Diagram)
-               - DFD (Data Flow Diagram)
-               - Flowchart, Architecture Diagram, Network Diagram, or any other type
-
-            2. ANALYZE the technical notation in detail:
-               - Relationships and cardinalities: one-to-one (1:1), one-to-many (1:N),
-                 many-to-many (M:N); crow's foot notation; UML multiplicity (0..*, 1..1, etc.)
-               - UML association types: aggregation (hollow diamond), composition (filled diamond),
-                 inheritance/generalization (hollow triangle arrow), dependency (dashed arrow),
-                 realization (dashed hollow triangle), directed association (filled arrowhead)
-               - Use Case notation: <<include>> (dashed arrow, mandatory), <<extend>> (dashed arrow,
-                 conditional), actor-to-use-case lines, system boundary rectangles
-               - ERD: primary keys (PK), foreign keys (FK), weak entities, identifying relationships
-               - Activity/State: guard conditions in brackets, action labels, fork/join bars,
-                 initial (filled circle) and final (bullseye) nodes
-               - Sequence: lifelines, activation bars, synchronous (filled arrowhead) vs.
-                 asynchronous (open arrowhead) messages, return messages (dashed)
-               - Swimlanes: correct assignment of actions to the responsible actor/system
-
-            3. EVALUATE correctness and completeness:
-               - Are relationship types and cardinalities semantically correct for this domain?
-               - Are notation symbols used correctly per UML 2.x / IEEE / ER standards?
-               - Are there orphaned entities, missing relationships, or broken associations?
-               - Do the diagrams logically align with the written sections of the document?
-               - Are labels, roles, and multiplicity values present where required?
-
-            4. REPORT findings under "Diagram Analysis" in the output.
-               Use this format for each diagram found:
-
-               * [IMG-X] - <Diagram Type>:
-                 - Notation observed: <specific symbols, relationship types, and labels found>
-                 - Correctness: <assessment of whether notation is used properly>
-                 - Issues: <specific errors, missing elements, or inconsistencies>
-                 - Alignment: <whether the diagram matches the written content>
-
-            If no diagrams or figures are detected in the images, make a note of this to output "None detected." in STEP 6. Do NOT output the literal string "[IMG-X]" if there are no images.
+            %s
 
             ═══════════════════════════════════════════════════════════
             STEP 3 — RUBRIC
@@ -181,7 +159,7 @@ public class PromptSharedRulesService {
 
             For each criterion, your justification MUST:
               (a) Reference a specific section, passage, OR DIAGRAM (Evidence rule above).
-              (b) Explain WHY that evidence maps to the assigned score tier. 
+              (b) Explain WHY that evidence maps to the assigned score tier.
               (c) MANDATORY PENALTY: If a diagram is required for a section and contains notation errors (e.g., incorrect UML arrows or missing multiplicities), you MUST deduct at least 4 points from that section.
               (d) Match the numeric score to the tier described in your prose.
 
@@ -249,7 +227,9 @@ public class PromptSharedRulesService {
             %s
             """.formatted(
                 customBlock,
+                classContextBlock,
                 detectedType.name(),
+                diagramSection,
                 rubricSection,
                 revisionStep,
                 revisionFormat,

@@ -10,13 +10,10 @@ const AI_MANAGED_KEYS = new Set([
   'ACTIVE_AI_PROVIDER',
   'OPENAI_API_KEY',
   'OPENAI_MODEL',
-  'GEMINI_API_KEY',
-  'GEMINI_MODEL',
 ]);
 
 const PROVIDER_TO_KEYS = {
   openai: { apiKey: 'OPENAI_API_KEY', model: 'OPENAI_MODEL' },
-  gemini: { apiKey: 'GEMINI_API_KEY', model: 'GEMINI_MODEL' },
 };
 
 const MASKED = '••••••••';
@@ -32,7 +29,6 @@ function isMasked(value) {
 function detectProviderFromApiKey(value) {
   const trimmed = (value || '').trim();
   if (trimmed.length < 4) return null;
-  if (/^AIza[A-Za-z0-9_-]{8,}$/.test(trimmed)) return 'gemini';
   if (/^sk-[a-z0-9_-]{4,}$/i.test(trimmed)) return 'openai';
   return null;
 }
@@ -43,14 +39,8 @@ function validateApiKeyFormat(providerId, value) {
   if (providerId === 'openai' && !trimmed.startsWith('sk-')) {
     return 'OpenAI API keys must start with "sk-". This looks like it may be a Gemini key.';
   }
-  if (providerId === 'gemini' && trimmed.startsWith('sk-')) {
-    return 'Gemini API keys should not start with "sk-". This looks like it may be an OpenAI key.';
-  }
   if (providerId === 'openai' && trimmed.length < 20) {
     return 'This key looks too short. Please double-check your OpenAI API key.';
-  }
-  if (providerId === 'gemini' && !trimmed.startsWith('AIza')) {
-    return 'Gemini API keys typically start with "AIza". Please double-check your key.';
   }
   return null;
 }
@@ -78,7 +68,6 @@ export default function TeacherSettingsPanel({
     if (aiRuntimeSettings?.providers?.length) return aiRuntimeSettings.providers;
     return [
       { id: 'openai', label: 'OpenAI', apiKeyConfigured: false, selectedModel: '', availableModels: [] },
-      { id: 'gemini', label: 'Gemini', apiKeyConfigured: false, selectedModel: '', availableModels: [] },
     ];
   }, [aiRuntimeSettings]);
 
@@ -89,11 +78,11 @@ export default function TeacherSettingsPanel({
     return isBlank(fromSettings) ? 'openai' : fromSettings;
   });
 
-  const [apiKeyDrafts, setApiKeyDrafts] = useState({ openai: '', gemini: '' });
-  const [apiKeyEditing, setApiKeyEditing] = useState({ openai: false, gemini: false });
-  const [apiKeyErrors, setApiKeyErrors] = useState({ openai: '', gemini: '' });
+  const [apiKeyDrafts, setApiKeyDrafts] = useState({ openai: ''});
+  const [apiKeyEditing, setApiKeyEditing] = useState({ openai: false});
+  const [apiKeyErrors, setApiKeyErrors] = useState({ openai: ''});
   const [providerDetectionNotice, setProviderDetectionNotice] = useState('');
-  const [modelSelections, setModelSelections] = useState({ openai: '', gemini: '' });
+  const [modelSelections, setModelSelections] = useState({ openai: ''});
   const [showTrashBin, setShowTrashBin] = useState(false);
   const [selectedTrashKeys, setSelectedTrashKeys] = useState([]);
   const [trashDialog, setTrashDialog] = useState(null);

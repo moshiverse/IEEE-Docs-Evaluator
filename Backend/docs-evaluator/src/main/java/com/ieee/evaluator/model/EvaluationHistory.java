@@ -15,12 +15,8 @@ public class EvaluationHistory {
     private Long id;
 
     private String fileId;
-    
-    private String fileName;
 
-    // FIX #5 (optional): Add a dedicated groupCode column to avoid filtering
-    // by fileName LIKE %groupCode%. Uncomment + add a DB migration if adopted.
-    // private String groupCode;
+    private String fileName;
 
     private String modelUsed;
 
@@ -35,9 +31,14 @@ public class EvaluationHistory {
     @Column(name = "is_sent", columnDefinition = "boolean default false")
     private Boolean isSent = false;
 
-    // FIX #2: Added FetchType.EAGER to prevent LazyInitializationException
-    // when extractedImages is accessed outside of an active transaction
-    // (e.g., during JSON serialization in the controller).
+    // ── Soft delete ───────────────────────────────────────────────────────────
+    @Column(name = "is_deleted", columnDefinition = "boolean default false")
+    private Boolean isDeleted = false;
+
+    // ── Version number — 1 = first submission, 2 = first revision, etc. ──────
+    @Column(name = "version", columnDefinition = "integer default 1")
+    private Integer version = 1;
+
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "evaluation_images", joinColumns = @JoinColumn(name = "history_id"))
     @Column(name = "image_data", columnDefinition = "TEXT")

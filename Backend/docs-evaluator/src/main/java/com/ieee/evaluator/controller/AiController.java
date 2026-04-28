@@ -25,10 +25,8 @@ public class AiController {
         this.historyRepository = historyRepository;
     }
 
-    /**
-     * Triggers document analysis.
-     * Returns an AnalysisResultDTO containing "analysis" (String) and "images" (List of Base64 Strings).
-     */
+    // ── POST /api/ai/analyze ──────────────────────────────────────────────────
+
     @PostMapping("/analyze")
     public ResponseEntity<?> analyzeFile(@RequestBody Map<String, String> payload) {
         try {
@@ -54,9 +52,12 @@ public class AiController {
         }
     }
 
+    // ── GET /api/ai/history ───────────────────────────────────────────────────
+
     @GetMapping("/history")
     public ResponseEntity<?> getHistory() {
         try {
+            // Only returns records where is_deleted = false
             return ResponseEntity.ok(historyRepository.findAllSummaries());
         } catch (Exception e) {
             e.printStackTrace();
@@ -64,6 +65,8 @@ public class AiController {
                     .body("Failed to retrieve history.");
         }
     }
+
+    // ── PUT /api/ai/history/{id} ──────────────────────────────────────────────
 
     @PutMapping("/history/{id}")
     public ResponseEntity<?> updateHistoryItem(@PathVariable Long id, @RequestBody Map<String, String> payload) {
@@ -92,6 +95,8 @@ public class AiController {
         }
     }
 
+    // ── PUT /api/ai/history/{id}/send ─────────────────────────────────────────
+
     @PutMapping("/history/{id}/send")
     public ResponseEntity<?> sendReportToStudent(@PathVariable Long id) {
         try {
@@ -109,10 +114,49 @@ public class AiController {
         }
     }
 
+    // ── DELETE /api/ai/history/{id} — soft delete ─────────────────────────────
+
+    @DeleteMapping("/history/{id}")
+    public ResponseEntity<?> deleteHistoryItem(@PathVariable Long id) {
+        try {
+            EvaluationHistory history = historyRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Evaluation record not found"));
+
+            history.setIsDeleted(true);
+            historyRepository.save(history);
+            return ResponseEntity.ok(Map.of("message", "Report deleted successfully."));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Delete failed: " + e.getMessage()));
+        }
+    }
+
+    // ── PUT /api/ai/history/{id}/restore ──────────────────────────────────────
+
+    @PutMapping("/history/{id}/restore")
+    public ResponseEntity<?> restoreHistoryItem(@PathVariable Long id) {
+        try {
+            EvaluationHistory history = historyRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Evaluation record not found"));
+
+            history.setIsDeleted(false);
+            historyRepository.save(history);
+            return ResponseEntity.ok(Map.of("message", "Report restored successfully."));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Restore failed: " + e.getMessage()));
+        }
+    }
+
+    // ── GET /api/ai/student-reports ───────────────────────────────────────────
+
     @GetMapping("/student-reports")
     public ResponseEntity<?> getStudentReports(@RequestParam String groupCode) {
         try {
-            // Use the new safe DTO query
             return ResponseEntity.ok(historyRepository.findStudentSummaries(groupCode));
         } catch (Exception e) {
             e.printStackTrace();
@@ -121,20 +165,19 @@ public class AiController {
         }
     }
 
+    // ── GET /api/ai/history/{id} ──────────────────────────────────────────────
+
     @GetMapping("/history/{id}")
-    @Transactional(readOnly = true) // This keeps the Hibernate session open
+    @Transactional(readOnly = true)
     public ResponseEntity<?> getHistoryItem(@PathVariable Long id) {
         try {
             EvaluationHistory history = historyRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Evaluation record not found"));
-            
-            // MANUALLY TRIGGER THE LAZY LOAD:
-            // Accessing the size forces Hibernate to fetch the images 
-            // while the transaction is still active.
+
             if (history.getExtractedImages() != null) {
-                history.getExtractedImages().size(); 
+                history.getExtractedImages().size();
             }
-            
+
             return ResponseEntity.ok(history);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

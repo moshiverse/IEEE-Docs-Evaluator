@@ -84,7 +84,6 @@ public class OpenAiProvider implements AiProvider {
         }
 
         try {
-            // FIX 1: Pass customInstructions down into callOpenAi
             return callOpenAi(apiKey.trim(), model.trim(), text, base64Images, previousEvaluation, customInstructions);
         } catch (HttpClientErrorException e) {
             return handleHttpError(e, "OpenAI");
@@ -96,11 +95,9 @@ public class OpenAiProvider implements AiProvider {
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
-    // FIX 2: Update method signature to accept customInstructions
     private String callOpenAi(String apiKey, String model, String documentText, List<String> base64Images, String previousEvaluation, String customInstructions)
             throws com.fasterxml.jackson.core.JsonProcessingException {
-            
-        // FIX 3: Pass customInstructions to the prompt factory
+
         String prompt = promptFactory.buildPrompt(documentText, previousEvaluation, customInstructions);
 
         HttpHeaders headers = new HttpHeaders();
@@ -111,21 +108,25 @@ public class OpenAiProvider implements AiProvider {
         contentParts.add(Map.of("type", "text", "text", prompt));
 
         if (base64Images != null) {
-            int imageIndex = 1;
-            for (String image : base64Images) {
+            for (int i = 0; i < base64Images.size(); i++) {
+                String image = base64Images.get(i);
                 if (isBlank(image)) {
                     continue;
                 }
 
+                // TRUE page number: i+1 always equals the actual document page number
+                // because all pages are rendered in order with no filtering or skipping.
+                int pageNumber = i + 1;
                 contentParts.add(Map.of(
                     "type", "text",
-                    "text", "[IMG-" + imageIndex + "] Rendered PDF page " + imageIndex
+                    "text", "[IMG-" + pageNumber + "] This is page " + pageNumber +
+                            " of the actual document. Use [IMG-" + pageNumber +
+                            "] to reference this page in your analysis."
                 ));
 
                 Map<String, Object> imageUrl = new HashMap<>();
                 imageUrl.put("url", "data:image/jpeg;base64," + image);
                 contentParts.add(Map.of("type", "image_url", "image_url", imageUrl));
-                imageIndex++;
             }
         }
 

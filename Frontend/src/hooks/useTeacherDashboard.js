@@ -1,6 +1,7 @@
 import { API_BASE_URL } from '../api';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '../supabaseClient';
 import {
   analyzeSubmission,
   fetchAiRuntimeSettings,
@@ -9,10 +10,16 @@ import {
   fetchTeacherHistory,
   fetchTeacherSettings,
   fetchTeacherSubmissions,
+  fetchPromptTemplates,
   saveEvaluation,
   saveMultipleSettings,
   saveSetting,
   sendEvaluation,
+  softDeleteReport,
+  restoreReport,
+  fetchHiddenSubmissionIds,
+  hideSubmission,
+  restoreSubmission,
 } from '../services/dashboardService';
 import { buildFilterOptions, extractSubmissionMeta, filterSubmissions, normalizeSection, sortSubmissions } from '../utils/dashboardUtils';
 
@@ -49,56 +56,147 @@ export function useTeacherDashboard(showToast) {
   const [reportSelectedSection, setReportSelectedSection] = useState('');
   const [reportSelectedTeamCode, setReportSelectedTeamCode] = useState('');
 
-  const [deletedSubmissionIds, setDeletedSubmissionIds] = useState(() => {
-    const saved = localStorage.getItem('deletedTeacherSubmissionIds');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [permanentDeletedSubmissionIds, setPermanentDeletedSubmissionIds] = useState(() => {
-    const saved = localStorage.getItem('permanentDeletedTeacherSubmissionIds');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [deletedReportIds, setDeletedReportIds] = useState(() => {
-    const saved = localStorage.getItem('deletedTeacherReportIds');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [permanentDeletedReportIds, setPermanentDeletedReportIds] = useState(() => {
-    const saved = localStorage.getItem('permanentDeletedTeacherReportIds');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [hiddenSubmissionIds, setHiddenSubmissionIds] = useState([]);
 
   const [settings, setSettings] = useState([]);
   const [editedSettings, setEditedSettings] = useState({});
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [isSavingAll, setIsSavingAll] = useState(false);
   const [aiRuntimeSettings, setAiRuntimeSettings] = useState(null);
+  const [promptTemplates, setPromptTemplates] = useState([]);
 
   const [roster, setRoster] = useState([]);
 
-  // Holds the AbortController for the currently running analysis.
-  // Each new runAnalysis() call creates a fresh one, cancelling any prior run.
   const analysisAbortRef = useRef(null);
   const selectedFileRef = useRef(null);
   const isAnalyzeOpenRef = useRef(false);
 
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
-  useEffect(() => {
-    selectedFileRef.current = selectedFile;
-  }, [selectedFile]);
+  useEffect(() => { selectedFileRef.current = selectedFile; }, [selectedFile]);
+  useEffect(() => { isAnalyzeOpenRef.current = isAnalyzeOpen; }, [isAnalyzeOpen]);
+
+  // ── Real-time subscriptions ───────────────────────────────────────────────
 
   useEffect(() => {
-    isAnalyzeOpenRef.current = isAnalyzeOpen;
-  }, [isAnalyzeOpen]);
+    // evaluation_history — refreshes reports view and analyzedFileIds automatically
+    const historyChannel = supabase
+      .channel('teacher-evaluation-history')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'evaluation_history' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            // New evaluation completed — reload history silently
+            loadHistory().catch(() => {});
+          }
+          if (payload.eventType === 'UPDATE') {
+            // is_sent changed, is_deleted changed, or result edited
+            setHistoryLogs((prev) =>
+              prev.map((log) => {
+                if (log.id === payload.new.id) {
+                  // If soft-deleted by another session, remove from view
+                  if (payload.new.is_deleted) return null;
+                  // Otherwise merge the updated fields into the summary
+                  return {
+                    ...log,
+                    isSent: payload.new.is_sent,
+                    isDeleted: payload.new.is_deleted,
+                    version: payload.new.version,
+                  };
+                }
+                return log;
+              }).filter(Boolean)
+            );
+          }
+          if (payload.eventType === 'DELETE') {
+            setHistoryLogs((prev) => prev.filter((log) => log.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    // hidden_submissions — hiding/restoring reflects immediately across all sessions
+    const hiddenChannel = supabase
+      .channel('teacher-hidden-submissions')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'hidden_submissions' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setHiddenSubmissionIds((prev) =>
+              prev.includes(payload.new.file_id) ? prev : [...prev, payload.new.file_id]
+            );
+          }
+          if (payload.eventType === 'DELETE') {
+            setHiddenSubmissionIds((prev) =>
+              prev.filter((id) => id !== payload.old.file_id)
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    // prompt_templates — template list stays in sync across sessions
+    const templatesChannel = supabase
+      .channel('teacher-prompt-templates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'prompt_templates' },
+        () => {
+          // Re-fetch the full sorted list on any change
+          fetchPromptTemplates().then(setPromptTemplates).catch(() => {});
+        }
+      )
+      .subscribe();
+
+    // professor_doc_profiles — rubric/diagram overrides propagate immediately
+    const docProfilesChannel = supabase
+      .channel('teacher-doc-profiles')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'professor_doc_profiles' },
+        () => {
+          // No local state to update here — profiles are read by the backend
+          // at evaluation time. Just log for visibility.
+          console.info('[realtime] professor_doc_profiles updated');
+        }
+      )
+      .subscribe();
+
+    // class_context_profile — context change propagates immediately
+    const classContextChannel = supabase
+      .channel('teacher-class-context')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'class_context_profile' },
+        () => {
+          console.info('[realtime] class_context_profile updated');
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(historyChannel);
+      supabase.removeChannel(hiddenChannel);
+      supabase.removeChannel(templatesChannel);
+      supabase.removeChannel(docProfilesChannel);
+      supabase.removeChannel(classContextChannel);
+    };
+  }, []);
+
+  // ── Data loaders ──────────────────────────────────────────────────────────
 
   async function loadSubmissions() {
     try {
       setLoading(true);
       setError('');
-      const data = await fetchTeacherSubmissions();
+      const [data, hiddenIds] = await Promise.all([
+        fetchTeacherSubmissions(),
+        fetchHiddenSubmissionIds(),
+      ]);
       setFiles(data);
+      setHiddenSubmissionIds(hiddenIds);
     } catch (err) {
       setError(`Failed to load submissions: ${err.message}`);
     } finally {
@@ -139,8 +237,12 @@ export function useTeacherDashboard(showToast) {
 
   async function loadAiRuntime() {
     try {
-      const runtimeSettings = await fetchAiRuntimeSettings();
+      const [runtimeSettings, templates] = await Promise.all([
+        fetchAiRuntimeSettings(),
+        fetchPromptTemplates(),
+      ]);
       setAiRuntimeSettings(runtimeSettings);
+      setPromptTemplates(templates);
     } catch {
       // Keep UI usable with fallback options when runtime endpoint fails.
     }
@@ -163,10 +265,12 @@ export function useTeacherDashboard(showToast) {
     }
   }, [currentView]);
 
+  // ── Filter options ────────────────────────────────────────────────────────
+
   const filterOptions = useMemo(() => {
     const base = buildFilterOptions(files);
     if (roster.length > 0) {
-      const rosterSections = [...new Set(roster.map((s) => s.section).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const rosterSections  = [...new Set(roster.map((s) => s.section).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       const rosterTeamCodes = [...new Set(roster.map((s) => s.groupCode).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       return { ...base, sections: rosterSections, teamCodes: rosterTeamCodes };
     }
@@ -176,29 +280,10 @@ export function useTeacherDashboard(showToast) {
   const filteredFiles = useMemo(
     () =>
       filterSubmissions(
-        files.filter(
-          (item) =>
-            !deletedSubmissionIds.includes(item.id) &&
-            !permanentDeletedSubmissionIds.includes(item.id),
-        ),
-        {
-        selectedStudent,
-        selectedSection,
-        selectedTeamCode,
-        selectedDocType,
-        searchQuery,
-        },
+        files.filter((item) => !hiddenSubmissionIds.includes(item.id)),
+        { selectedStudent, selectedSection, selectedTeamCode, selectedDocType, searchQuery },
       ),
-    [
-      files,
-      deletedSubmissionIds,
-      permanentDeletedSubmissionIds,
-      selectedStudent,
-      selectedSection,
-      selectedTeamCode,
-      selectedDocType,
-      searchQuery,
-    ],
+    [files, hiddenSubmissionIds, selectedStudent, selectedSection, selectedTeamCode, selectedDocType, searchQuery],
   );
 
   const sortedFiles = useMemo(() => sortSubmissions(filteredFiles, sortConfig), [filteredFiles, sortConfig]);
@@ -225,15 +310,12 @@ export function useTeacherDashboard(showToast) {
         const meta = extractSubmissionMeta(item.name);
         return meta.studentName.toLowerCase().includes(query);
       });
-
       const rosterMatched = scopedRoster.filter((s) => s.studentName?.toLowerCase().includes(query));
       const matchedNames = [...new Set([
         ...matched.map((f) => extractSubmissionMeta(f.name).studentName),
         ...rosterMatched.map((s) => s.studentName),
       ].filter(Boolean))];
-
       const displayName = matchedNames.length === 1 ? matchedNames[0] : null;
-
       return {
         studentName: displayName,
         studentCount: matchedNames.length,
@@ -259,111 +341,131 @@ export function useTeacherDashboard(showToast) {
   }, [files, roster, selectedSection, selectedTeamCode, searchQuery]);
 
   const reportDocTypeOptions = useMemo(
-    () =>
-      [...new Set(historyLogs.map((item) => extractSubmissionMeta(item.fileName).documentType).filter(Boolean))]
-        .sort((a, b) => a.localeCompare(b)),
+    () => [...new Set(historyLogs.map((item) => extractSubmissionMeta(item.fileName).documentType).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [historyLogs],
   );
 
   const reportFilterOptions = useMemo(() => {
-    const students = new Set();
-    const sections = new Set();
+    const students  = new Set();
+    const sections  = new Set();
     const teamCodes = new Set();
-
     historyLogs.forEach((item) => {
       const meta = extractSubmissionMeta(item.fileName);
       if (meta.studentName) students.add(meta.studentName);
-      if (meta.section) sections.add(meta.section);
-      if (meta.teamCode) teamCodes.add(meta.teamCode);
+      if (meta.section)     sections.add(meta.section);
+      if (meta.teamCode)    teamCodes.add(meta.teamCode);
     });
-
     if (roster.length > 0) {
-      const rosterSections = [...new Set(roster.map((s) => s.section).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-      const rosterTeamCodes = [...new Set(roster.map((s) => s.groupCode).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       return {
-        students: [...students].sort((a, b) => a.localeCompare(b)),
-        sections: rosterSections,
-        teamCodes: rosterTeamCodes,
+        students:  [...students].sort((a, b) => a.localeCompare(b)),
+        sections:  [...new Set(roster.map((s) => s.section).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+        teamCodes: [...new Set(roster.map((s) => s.groupCode).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
       };
     }
-
     return {
-      students: [...students].sort((a, b) => a.localeCompare(b)),
-      sections: [...sections].sort((a, b) => a.localeCompare(b)),
+      students:  [...students].sort((a, b) => a.localeCompare(b)),
+      sections:  [...sections].sort((a, b) => a.localeCompare(b)),
       teamCodes: [...teamCodes].sort((a, b) => a.localeCompare(b)),
     };
   }, [historyLogs, roster]);
 
   const filteredHistoryLogs = useMemo(() => {
     const query = reportSearchQuery.trim().toLowerCase();
+    return historyLogs.filter((log) => {
+      const docType = extractSubmissionMeta(log.fileName).documentType;
+      const meta    = extractSubmissionMeta(log.fileName);
+      if (reportStatusFilter === 'sent'    && !log.isSent) return false;
+      if (reportStatusFilter === 'pending' &&  log.isSent) return false;
+      if (reportDocTypeFilter && docType !== reportDocTypeFilter) return false;
+      if (reportSelectedStudent  && meta.studentName !== reportSelectedStudent) return false;
+      if (reportSelectedSection  && meta.section !== normalizeSection(reportSelectedSection)) return false;
+      if (reportSelectedTeamCode && meta.teamCode !== reportSelectedTeamCode.toUpperCase()) return false;
+      if (query) {
+        const searchable = [log.fileName, log.isSent ? 'sent' : 'pending', log.evaluatedAt]
+          .filter(Boolean).join(' ').toLowerCase();
+        if (!searchable.includes(query)) return false;
+      }
+      return true;
+    });
+  }, [historyLogs, reportSearchQuery, reportStatusFilter, reportDocTypeFilter, reportSelectedStudent, reportSelectedSection, reportSelectedTeamCode]);
 
-    return historyLogs
-      .filter((log) => !deletedReportIds.includes(log.id) && !permanentDeletedReportIds.includes(log.id))
-      .filter((log) => {
-        const docType = extractSubmissionMeta(log.fileName).documentType;
-        const meta = extractSubmissionMeta(log.fileName);
+  const allHistoryCount = historyLogs.length;
 
-        if (reportStatusFilter === 'sent' && !log.isSent) return false;
-        if (reportStatusFilter === 'pending' && log.isSent) return false;
-        if (reportDocTypeFilter && docType !== reportDocTypeFilter) return false;
-        if (reportSelectedStudent && meta.studentName !== reportSelectedStudent) return false;
-        if (reportSelectedSection && meta.section !== normalizeSection(reportSelectedSection)) return false;
-        if (reportSelectedTeamCode && meta.teamCode !== reportSelectedTeamCode.toUpperCase()) return false;
-
-        if (query) {
-          const searchable = [
-            log.fileName,
-            log.isSent ? 'sent' : 'pending',
-            log.evaluatedAt,
-          ]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
-
-          if (!searchable.includes(query)) return false;
-        }
-
-        return true;
-      });
-  }, [
-    historyLogs,
-    deletedReportIds,
-    permanentDeletedReportIds,
-    reportSearchQuery,
-    reportStatusFilter,
-    reportDocTypeFilter,
-    reportSelectedStudent,
-    reportSelectedSection,
-    reportSelectedTeamCode,
-  ]);
-
-  const allHistoryCount = historyLogs.filter(
-    (log) => !deletedReportIds.includes(log.id) && !permanentDeletedReportIds.includes(log.id),
-  ).length;
+  // ── Trash bin summary ─────────────────────────────────────────────────────
 
   const trashBinSummary = useMemo(() => {
     const trashedSubmissions = files
-      .filter((item) => deletedSubmissionIds.includes(item.id))
+      .filter((item) => hiddenSubmissionIds.includes(item.id))
       .map((item) => ({ id: item.id, kind: 'submission', label: item.name, meta: 'Student Submission' }));
-
-    const trashedReports = historyLogs
-      .filter((log) => deletedReportIds.includes(log.id))
-      .map((log) => ({ id: log.id, kind: 'report', label: log.fileName, date: log.evaluatedAt, meta: 'AI Report / History' }));
-
-    const trashedItems = [...trashedSubmissions, ...trashedReports].sort((a, b) => {
-      const aTime = a.date ? new Date(a.date).getTime() : 0;
-      const bTime = b.date ? new Date(b.date).getTime() : 0;
-      return bTime - aTime;
-    });
 
     return {
       submissionCount: trashedSubmissions.length,
-      reportCount: trashedReports.length,
+      reportCount: 0,
       trashedSubmissions,
-      trashedReports,
-      trashedItems,
+      trashedReports: [],
+      trashedItems: trashedSubmissions,
     };
-  }, [files, historyLogs, deletedSubmissionIds, deletedReportIds]);
+  }, [files, hiddenSubmissionIds]);
+
+  // ── Trash actions ─────────────────────────────────────────────────────────
+
+  async function deleteReport(reportId) {
+    try {
+      await softDeleteReport(reportId);
+      setHistoryLogs((prev) => prev.filter((log) => log.id !== reportId));
+      showToast('Report deleted.', 'success');
+    } catch (err) {
+      showToast(`Failed to delete report: ${err.message}`, 'error');
+    }
+  }
+
+  async function deleteSubmission(fileId) {
+    try {
+      await hideSubmission(fileId);
+      setHiddenSubmissionIds((prev) => [...prev, fileId]);
+      showToast('Submission hidden.', 'success');
+    } catch (err) {
+      showToast(`Failed to hide submission: ${err.message}`, 'error');
+    }
+  }
+
+  async function restoreSelectedTrashItems(selectedItems = []) {
+    const items = selectedItems.filter(Boolean);
+    if (!items.length) {
+      showToast('Select one or more trashed items to restore.', 'success');
+      return;
+    }
+    try {
+      await Promise.all(
+        items.map((item) =>
+          item.kind === 'submission'
+            ? restoreSubmission(item.id)
+            : restoreReport(item.id)
+        )
+      );
+      const restoredSubmissionIds = items.filter((i) => i.kind === 'submission').map((i) => i.id);
+      setHiddenSubmissionIds((prev) => prev.filter((id) => !restoredSubmissionIds.includes(id)));
+      showToast(`Restored ${items.length} item(s).`, 'success');
+    } catch (err) {
+      showToast(`Failed to restore items: ${err.message}`, 'error');
+    }
+  }
+
+  async function safeEmptyAllTrashBins() {
+    if (!hiddenSubmissionIds.length) {
+      showToast('Trash bins are already empty.', 'success');
+      return;
+    }
+    try {
+      await Promise.all(hiddenSubmissionIds.map((id) => restoreSubmission(id)));
+      setHiddenSubmissionIds([]);
+      showToast('Trash cleared.', 'success');
+    } catch (err) {
+      showToast(`Failed to empty trash: ${err.message}`, 'error');
+    }
+  }
+
+  // ── Submissions ───────────────────────────────────────────────────────────
 
   function clearReportFilters() {
     setReportSelectedStudent('');
@@ -374,135 +476,17 @@ export function useTeacherDashboard(showToast) {
     setReportSearchQuery('');
   }
 
-  function deleteReport(reportId) {
-    const updated = [...deletedReportIds, reportId];
-    setDeletedReportIds(updated);
-    localStorage.setItem('deletedTeacherReportIds', JSON.stringify(updated));
-    showToast('Report moved to trash.', 'success');
-  }
-
-  function restoreSelectedTrashItems(selectedItems = []) {
-    const items = selectedItems.filter(Boolean);
-    if (!items.length) {
-      showToast('Select one or more trashed items to restore.', 'success');
-      return;
-    }
-
-    const submissionIds = items.filter((item) => item.kind === 'submission').map((item) => item.id);
-    const reportIds = items.filter((item) => item.kind === 'report').map((item) => item.id);
-
-    const nextSubmissionIds = deletedSubmissionIds.filter((id) => !submissionIds.includes(id));
-    const nextReportIds = deletedReportIds.filter((id) => !reportIds.includes(id));
-
-    setDeletedSubmissionIds(nextSubmissionIds);
-    setDeletedReportIds(nextReportIds);
-    localStorage.setItem('deletedTeacherSubmissionIds', JSON.stringify(nextSubmissionIds));
-    localStorage.setItem('deletedTeacherReportIds', JSON.stringify(nextReportIds));
-    showToast(`Restored ${items.length} selected item(s) from trash.`, 'success');
-  }
-
-  function restoreSubmissionFromTrash(submissionId) {
-    if (!deletedSubmissionIds.includes(submissionId)) return;
-
-    const updated = deletedSubmissionIds.filter((id) => id !== submissionId);
-    setDeletedSubmissionIds(updated);
-    localStorage.setItem('deletedTeacherSubmissionIds', JSON.stringify(updated));
-    showToast('Submission restored from trash.', 'success');
-  }
-
-  function restoreReportFromTrash(reportId) {
-    if (!deletedReportIds.includes(reportId)) return;
-
-    const updated = deletedReportIds.filter((id) => id !== reportId);
-    setDeletedReportIds(updated);
-    localStorage.setItem('deletedTeacherReportIds', JSON.stringify(updated));
-    showToast('Report restored from trash.', 'success');
-  }
-
-  function restoreTrashItem(kind, itemId) {
-    if (kind === 'submission') {
-      restoreSubmissionFromTrash(itemId);
-      return;
-    }
-
-    if (kind === 'report') {
-      restoreReportFromTrash(itemId);
-    }
-  }
-
-  function safeEmptyAllTrashBins() {
-    const hasTrash = deletedSubmissionIds.length > 0 || deletedReportIds.length > 0;
-    if (!hasTrash) {
-      showToast('Trash bins are already empty.', 'success');
-      return;
-    }
-
-    const removedSubmissionCount = deletedSubmissionIds.length;
-    const removedReportCount = deletedReportIds.length;
-
-    setDeletedSubmissionIds([]);
-    setDeletedReportIds([]);
-    localStorage.setItem('deletedTeacherSubmissionIds', JSON.stringify([]));
-    localStorage.setItem('deletedTeacherReportIds', JSON.stringify([]));
-    showToast(
-      `Trash cleared from the frontend: ${removedSubmissionCount} submission(s), ${removedReportCount} report(s).`,
-      'success',
-    );
-  }
-
-  function restoreAllFilesFromTrash() {
-    const hasTrash = deletedSubmissionIds.length > 0 || deletedReportIds.length > 0;
-    if (!hasTrash) {
-      showToast('No trashed items to restore.', 'success');
-      return;
-    }
-
-    setDeletedSubmissionIds([]);
-    setDeletedReportIds([]);
-    localStorage.setItem('deletedTeacherSubmissionIds', JSON.stringify([]));
-    localStorage.setItem('deletedTeacherReportIds', JSON.stringify([]));
-    showToast('All trashed files restored.', 'success');
-  }
-
-  function deleteAllRecordsPermanently() {
-    const hasAnyData = files.length > 0 || historyLogs.length > 0 || deletedSubmissionIds.length > 0 || deletedReportIds.length > 0;
-    if (!hasAnyData) {
-      showToast('No records available to delete permanently.', 'success');
-      return;
-    }
-
-    const allSubmissionIds = [...new Set([
-      ...permanentDeletedSubmissionIds,
-      ...deletedSubmissionIds,
-      ...files.map((item) => item.id).filter(Boolean),
-    ])];
-
-    const allReportIds = [...new Set([
-      ...permanentDeletedReportIds,
-      ...deletedReportIds,
-      ...historyLogs.map((log) => log.id).filter(Boolean),
-    ])];
-
-    setPermanentDeletedSubmissionIds(allSubmissionIds);
-    setPermanentDeletedReportIds(allReportIds);
-    localStorage.setItem('permanentDeletedTeacherSubmissionIds', JSON.stringify(allSubmissionIds));
-    localStorage.setItem('permanentDeletedTeacherReportIds', JSON.stringify(allReportIds));
-
-    setDeletedSubmissionIds([]);
-    setDeletedReportIds([]);
-    localStorage.setItem('deletedTeacherSubmissionIds', JSON.stringify([]));
-    localStorage.setItem('deletedTeacherReportIds', JSON.stringify([]));
-
-    showToast('All records permanently deleted from this device view.', 'success');
-  }
-
   async function handleManualSync() {
     if (loading || isSyncing) return;
     try {
       setIsSyncing(true);
       setError('');
-      const data = await fetchTeacherSubmissions();
+      const [data, hiddenIds] = await Promise.all([
+        fetchTeacherSubmissions(),
+        fetchHiddenSubmissionIds(),
+      ]);
       setFiles(data);
+      setHiddenSubmissionIds(hiddenIds);
       showToast('Submissions synced successfully.', 'success');
     } catch (err) {
       setError(`Sync failed: ${err.message}`);
@@ -524,6 +508,8 @@ export function useTeacherDashboard(showToast) {
     setSearchQuery('');
   }
 
+  // ── Analyze modal ─────────────────────────────────────────────────────────
+
   function openAnalyzeModal(file) {
     if (analysisAbortRef.current && selectedFileRef.current?.id !== file?.id) {
       analysisAbortRef.current.abort();
@@ -542,7 +528,6 @@ export function useTeacherDashboard(showToast) {
       analysisAbortRef.current.abort();
       analysisAbortRef.current = null;
     }
-
     setIsAnalyzing(false);
     setAiResult('');
     setAiImages([]);
@@ -551,18 +536,13 @@ export function useTeacherDashboard(showToast) {
     setIsAnalyzeOpen(false);
   }
 
-  // --- NEW: Added customInstructions to the runAnalysis parameters ---
   async function runAnalysis(modelName) {
     if (!selectedFile) return;
-
-    // Do not start another run while one is still in progress.
     if (analysisAbortRef.current && !analysisAbortRef.current.signal.aborted) return;
 
-    // Fresh controller for this specific run
     const controller = new AbortController();
     analysisAbortRef.current = controller;
-
-    const fileToAnalyze = selectedFile;
+    const fileToAnalyze      = selectedFile;
     const customInstructions = customRules;
 
     try {
@@ -571,7 +551,6 @@ export function useTeacherDashboard(showToast) {
       setAiImages([]);
       setCustomRules('');
 
-      // --- NEW: Pass customInstructions into analyzeSubmission ---
       const data = await analyzeSubmission(
         fileToAnalyze.id,
         fileToAnalyze.name,
@@ -580,23 +559,16 @@ export function useTeacherDashboard(showToast) {
         controller.signal,
       );
 
-      // If this run was aborted because a newer one started, bail silently
       if (controller.signal.aborted) return;
-
-      // Ignore stale completions if user switched to another file or closed modal.
       if (!isAnalyzeOpenRef.current || selectedFileRef.current?.id !== fileToAnalyze.id) return;
 
       setAiResult(data.analysis);
-      setAiImages(data.images || []); // Store the images in state
-
-      // Refresh history in background — must not block or clear the result
-      loadHistory().catch(() => {});
+      setAiImages(data.images || []);
+      // History will update via real-time subscription — no manual reload needed
     } catch (err) {
-      // AbortError = a new analysis was started intentionally, stay silent
       if (err.name === 'AbortError') return;
       setAiResult(`Error: ${err.message}`);
     } finally {
-      // Only clear the loading flag if this is still the active run
       if (analysisAbortRef.current === controller) {
         setIsAnalyzing(false);
         analysisAbortRef.current = null;
@@ -604,25 +576,26 @@ export function useTeacherDashboard(showToast) {
     }
   }
 
+  // ── History modal ─────────────────────────────────────────────────────────
+
   async function startEditingHistory(item) {
-      if (!item?.id) {
-        showToast("Cannot load report: Missing ID", "error");
-        return;
+    if (!item?.id) {
+      showToast('Cannot load report: Missing ID', 'error');
+      return;
     }
-      setIsLoadingDetails(true); // Start loading
-      setSelectedHistoryItem(item); // Show the summary info immediately
-      
-      try {
-          const full = await fetchHistoryItem(item.id);
-          setSelectedHistoryItem(full);
-          setEditedReportText(full.evaluationResult || '');
-          setEditedTeacherFeedback(full.teacherFeedback || '');
-          setAiImages(full.extractedImages || []);
-      } catch (err) {
-          showToast(`Failed to load report details: ${err.message}`, 'error');
-      } finally {
-          setIsLoadingDetails(false); // Stop loading
-      }
+    setIsLoadingDetails(true);
+    setSelectedHistoryItem(item);
+    try {
+      const full = await fetchHistoryItem(item.id);
+      setSelectedHistoryItem(full);
+      setEditedReportText(full.evaluationResult || '');
+      setEditedTeacherFeedback(full.teacherFeedback || '');
+      setAiImages(full.extractedImages || []);
+    } catch (err) {
+      showToast(`Failed to load report details: ${err.message}`, 'error');
+    } finally {
+      setIsLoadingDetails(false);
+    }
   }
 
   async function saveEditedHistory() {
@@ -657,6 +630,8 @@ export function useTeacherDashboard(showToast) {
     setIsEditingReport(false);
   }
 
+  // ── Settings ──────────────────────────────────────────────────────────────
+
   function handleSettingChange(key, value) {
     setEditedSettings((prev) => ({ ...prev, [key]: value }));
   }
@@ -678,7 +653,6 @@ export function useTeacherDashboard(showToast) {
 
   async function saveAiSettingsBatch(payload) {
     if (!payload || !Object.keys(payload).length) return;
-
     try {
       setIsSavingAll(true);
       await saveMultipleSettings(payload);
@@ -690,6 +664,8 @@ export function useTeacherDashboard(showToast) {
       setIsSavingAll(false);
     }
   }
+
+  // ── Exports ───────────────────────────────────────────────────────────────
 
   return {
     currentView,
@@ -739,6 +715,7 @@ export function useTeacherDashboard(showToast) {
     setEditedReportText,
     editedTeacherFeedback,
     setEditedTeacherFeedback,
+    promptTemplates,
     handleManualSync,
     requestSort,
     setSelectedStudent,
@@ -766,10 +743,10 @@ export function useTeacherDashboard(showToast) {
     saveAllSettings,
     loadSettings,
     deleteReport,
+    deleteSubmission,
     restoreSelectedTrashItems,
     safeEmptyAllTrashBins,
     trashBinSummary,
-    deletedReportIds,
-    deletedSubmissionIds,
+    hiddenSubmissionIds,
   };
 }

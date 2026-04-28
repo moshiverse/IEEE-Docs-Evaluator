@@ -1,0 +1,385 @@
+/* ── Professor Workspace ─────────────────────────────────────────────────────*/
+
+.pw-root {
+  display: grid;
+  gap: 1.25rem;
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+
+.pw-card {
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  padding: 1.25rem;
+  box-shadow: 0 8px 20px var(--shadow);
+}
+
+.pw-card__header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.pw-card__title {
+  margin: 0 0 0.2rem;
+  color: var(--text-main);
+  font-size: 1.05rem;
+}
+
+.pw-muted {
+  margin: 0 0 0.85rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.pw-btn {
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+  padding: 0.58rem 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: box-shadow 0.15s ease;
+  white-space: nowrap;
+}
+
+.pw-btn:hover {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--glow) 45%, transparent);
+}
+
+.pw-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pw-btn--primary {
+  background: linear-gradient(140deg, var(--brand), var(--brand-strong));
+  border: none;
+  color: #fff;
+}
+
+[data-theme='dark'] .pw-btn--primary {
+  background: var(--brand);
+  color: #17202b;
+}
+
+.pw-btn--ghost {
+  background: transparent;
+  color: var(--text-main);
+  border-color: var(--line-soft);
+}
+
+.pw-btn--soft {
+  background: var(--brand-soft);
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--line-soft));
+  color: var(--brand);
+}
+
+.pw-btn--danger {
+  background: linear-gradient(140deg, #dc2626, #b91c1c);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+/* ── Fields ──────────────────────────────────────────────────────────────── */
+
+.pw-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+}
+
+.pw-label {
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.pw-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.pw-input {
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 0.62rem 0.72rem;
+  background: var(--bg-surface-2);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.pw-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--brand) 55%, var(--line-soft));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--glow) 38%, transparent);
+}
+
+.pw-textarea {
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 0.72rem;
+  background: var(--bg-surface-2);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  resize: vertical;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.pw-textarea--tall {
+  min-height: 120px;
+}
+
+.pw-textarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--brand) 55%, var(--line-soft));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--glow) 38%, transparent);
+}
+
+.pw-action-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 0.9rem;
+}
+
+/* ── Doc type tabs ───────────────────────────────────────────────────────── */
+
+.pw-tabs {
+  display: flex;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.pw-tab {
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--bg-surface-2);
+  color: var(--text-muted);
+  padding: 0.45rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.15s;
+}
+
+.pw-tab:hover {
+  color: var(--text-main);
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--line-soft));
+}
+
+.pw-tab--active {
+  color: var(--brand);
+  border-color: color-mix(in srgb, var(--brand) 45%, var(--line-soft));
+  background: var(--brand-soft);
+}
+
+.pw-tab__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand);
+  flex-shrink: 0;
+}
+
+/* ── Override status pills ───────────────────────────────────────────────── */
+
+.pw-override-status-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.pw-override-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.pw-override-pill--active {
+  background: color-mix(in srgb, var(--brand) 14%, var(--bg-surface));
+  color: var(--brand);
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, var(--line-soft));
+}
+
+.pw-override-pill--default {
+  background: color-mix(in srgb, #64748b 12%, var(--bg-surface));
+  color: var(--text-muted);
+  border: 1px solid color-mix(in srgb, #64748b 25%, var(--line-soft));
+}
+
+.pw-doc-profile {
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  padding: 1rem;
+  background: var(--bg-surface-2);
+}
+
+/* ── Template list ───────────────────────────────────────────────────────── */
+
+.pw-template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1.1rem;
+}
+
+.pw-template-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--bg-surface-2);
+}
+
+.pw-template-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.pw-template-item__name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text-main);
+}
+
+.pw-template-item__preview {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pw-template-item__actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.pw-template-form {
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  padding: 1rem;
+  background: var(--bg-surface-2);
+}
+
+.pw-template-form__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.92rem;
+  color: var(--text-main);
+}
+
+/* ── Render settings ─────────────────────────────────────────────────────── */
+
+.pw-render-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.85rem 1.2rem;
+  align-items: start;
+}
+
+.pw-cost-estimate {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line-soft));
+  background: color-mix(in srgb, var(--brand) 6%, var(--bg-surface));
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.pw-cost-estimate__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--brand);
+}
+
+.pw-cost-estimate__value {
+  font-size: 0.88rem;
+  color: var(--text-main);
+}
+
+.pw-cost-estimate__note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* ── Dark mode ───────────────────────────────────────────────────────────── */
+
+[data-theme='dark'] .pw-card {
+  background: var(--bg-surface);
+}
+
+[data-theme='dark'] .pw-input,
+[data-theme='dark'] .pw-textarea {
+  background: var(--bg-surface-2);
+  color: var(--text-main);
+  border-color: var(--line-soft);
+}
+
+[data-theme='dark'] .pw-doc-profile,
+[data-theme='dark'] .pw-template-form,
+[data-theme='dark'] .pw-template-item {
+  background: var(--bg-surface);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .pw-card__header-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pw-render-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pw-template-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pw-template-item__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

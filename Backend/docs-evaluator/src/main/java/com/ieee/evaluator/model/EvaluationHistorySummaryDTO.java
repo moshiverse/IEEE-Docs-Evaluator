@@ -13,4 +13,5 @@ public class EvaluationHistorySummaryDTO {
     private String modelUsed;
     private LocalDateTime evaluatedAt;
     private Boolean isSent;
+    private Integer version;
 }

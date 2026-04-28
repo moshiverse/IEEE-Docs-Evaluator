@@ -3,8 +3,9 @@ import appLogo from '../../assets/logo.png';
 
 const NAV_ITEMS = [
   { key: 'submissions', label: 'Student Submissions' },
-  { key: 'reports', label: 'AI Reports' },
-  { key: 'settings', label: 'System Settings' },
+  { key: 'reports',     label: 'AI Reports' },
+  { key: 'workspace',   label: 'Professor Workspace' },
+  { key: 'settings',    label: 'System Settings' },
 ];
 
 function TeacherSidebar({ currentView, onNavigate }) {

@@ -13,25 +13,33 @@ import java.util.Optional;
 @Repository
 public interface EvaluationHistoryRepository extends JpaRepository<EvaluationHistory, Long> {
 
-    // Constructor expression — only selects the 6 lightweight columns, never touches
-    // the extractedImages or evaluationResult columns. Keeps the dashboard query fast.
+    // Only returns non-deleted records — includes version
     @Query("SELECT new com.ieee.evaluator.model.EvaluationHistorySummaryDTO(" +
-           "h.id, h.fileId, h.fileName, h.modelUsed, h.evaluatedAt, h.isSent) " +
-           "FROM EvaluationHistory h ORDER BY h.evaluatedAt DESC")
+           "h.id, h.fileId, h.fileName, h.modelUsed, h.evaluatedAt, h.isSent, h.version) " +
+           "FROM EvaluationHistory h " +
+           "WHERE h.isDeleted = false " +
+           "ORDER BY h.evaluatedAt DESC")
     List<EvaluationHistorySummaryDTO> findAllSummaries();
 
+    // Only returns non-deleted sent records for a given group code — includes version
     @Query("SELECT new com.ieee.evaluator.model.EvaluationHistorySummaryDTO(" +
-       "h.id, h.fileId, h.fileName, h.modelUsed, h.evaluatedAt, h.isSent) " +
-       "FROM EvaluationHistory h " +
-       "WHERE h.isSent = true AND LOWER(h.fileName) LIKE LOWER(CONCAT('%', :groupCode, '%')) " +
-       "ORDER BY h.evaluatedAt DESC")
+           "h.id, h.fileId, h.fileName, h.modelUsed, h.evaluatedAt, h.isSent, h.version) " +
+           "FROM EvaluationHistory h " +
+           "WHERE h.isSent = true " +
+           "AND h.isDeleted = false " +
+           "AND LOWER(h.fileName) LIKE LOWER(CONCAT('%', :groupCode, '%')) " +
+           "ORDER BY h.evaluatedAt DESC")
     List<EvaluationHistorySummaryDTO> findStudentSummaries(@Param("groupCode") String groupCode);
 
     List<EvaluationHistory> findByIsSentTrueAndFileNameContainingIgnoreCaseOrderByEvaluatedAtDesc(String groupCode);
 
-    // Used in analyzeOnce() to pass the last result as context to the AI
+    // Used in analyzeOnce() to get the previous evaluation for revision context
     Optional<EvaluationHistory> findTopByFileIdOrderByEvaluatedAtDesc(String fileId);
 
     // Used in persistHistory() to upsert instead of creating duplicates
     Optional<EvaluationHistory> findTopByFileIdAndModelUsedOrderByEvaluatedAtDesc(String fileId, String modelUsed);
+
+    // Used in persistHistory() to compute the next version number
+    @Query("SELECT COALESCE(MAX(h.version), 0) FROM EvaluationHistory h WHERE h.fileId = :fileId")
+    int findMaxVersionByFileId(@Param("fileId") String fileId);
 }
