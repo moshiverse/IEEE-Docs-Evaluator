@@ -1,65 +1,69 @@
-# IEEE-Docs-Evaluator
+# IEEE Docs Evaluator
 
-An AI-powered, web-based platform for the centralized submission and automated evaluation of software engineering documents — specifically **SRS**, **SDD**, **STD**, and **SPMP** — built for students and teachers at Cebu Institute of Technology - University.
+An AI-powered, web-based platform for the centralized submission and automated evaluation of software engineering documents — specifically SRS, SDD, STD, and SPMP — built for students and teachers at Cebu Institute of Technology - University.
 
 ---
 
-## 📌 Overview
+## Overview
 
 IEEE Docs Evaluator consolidates four separate AI-driven document evaluator systems into a single integrated application. It eliminates redundant workflows (e.g., separate logins per system) and provides a unified environment for document submission, AI-powered analysis, and teacher feedback — all in one place.
 
 ---
 
-## ✨ Features
+## Features
 
-- **Google OAuth 2.0** — Secure role-based login for teachers and students
-- **Google Drive Integration** — Class folder creation and document storage
-- **Google Sheets Integration** — Automated recording of submissions, AI results, and teacher feedback
-- **AI-Powered Evaluation** — Document analysis using Gemini, OpenAI GPT, or OpenRouter models
-- **Role-Based Access** — Separate dashboards and permissions for teachers and students
-- **Centralized Submission Portal** — Submit and track SRS, SDD, STD, and SPMP documents in one place
+- Google OAuth 2.0 — Secure role-based login for teachers and students
+- Google Drive Integration — Document downloading and rendering for AI analysis
+- Google Sheets Integration — Class roster, allowlist verification, and submission tracking
+- AI-Powered Evaluation — Document analysis using OpenAI GPT models
+- Role-Based Access — Separate dashboards and permissions for teachers and students
+- Centralized Submission Portal — Submit and track SRS, SDD, STD, and SPMP documents in one place
+- SSE Progress Streaming — Real-time step-by-step evaluation progress shown in the UI
+- Annotation System — Teachers can highlight and annotate specific sections of an evaluation report
+- Prompt Customization — Per-document-type rubric, diagram, and step overrides configurable by the professor
+- Evaluation History and Versioning — Every evaluation is saved as a new version for comparison over time
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | React.js + Vite |
-| Backend | Spring Boot (Java) |
+| Frontend | React 19 + Vite |
+| Backend | Spring Boot 4 (Java 21) |
 | Database | Supabase (PostgreSQL) |
-| Auth | Google OAuth 2.0 + JWT |
+| Auth | Google OAuth 2.0 via Supabase |
 | Storage | Google Drive API |
 | Spreadsheet | Google Sheets API |
-| AI Providers | Gemini API, OpenAI API, OpenRouter API |
-| PDF Parsing | Apache PDFBox |
-| HTTP Client | Axios |
+| AI Provider | OpenAI API |
+| PDF Rendering | Apache PDFBox |
+| Text Extraction | Apache Tika |
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 IEEE-Docs-Evaluator/
-├── Frontend/          # React.js + Vite application
+├── Frontend/               # React + Vite application
 └── Backend/
-    └── docs-evaluator/ # Spring Boot application
+    └── docs-evaluator/     # Spring Boot application
 ```
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- Node.js (v18+) and npm
+- Node.js (v20+) and npm
 - Java 21+
 - Maven
 - A Google Cloud project with the following APIs enabled:
   - Google OAuth 2.0
   - Google Drive API
   - Google Sheets API
-- API keys for at least one AI provider (Gemini, OpenAI, or OpenRouter)
+- An OpenAI API key
 - A Supabase project (PostgreSQL)
 
 ---
@@ -93,7 +97,8 @@ mvn spring-boot:run
 ```
 
 For deployment, start from `Backend/docs-evaluator/.env.render.example` and map each key into Render environment variables.
-For local teammate setup, create `Backend/docs-evaluator/src/main/resources/application-secrets.properties` and fill in real values:
+
+For local development, create `Backend/docs-evaluator/src/main/resources/application-secrets.properties` and fill in real values:
 
 ```properties
 # Database (Supabase Pooler)
@@ -107,7 +112,7 @@ app.google.spreadsheet-id=<google-sheet-id>
 app.google.service-account-json=
 app.google.service-account-json-base64=<base64-service-account-json>
 
-# Local runtime behavior
+# CORS
 app.cors.allowed-origins=http://localhost:5173
 app.openrouter.http-referer=http://localhost:5173
 app.openrouter.app-title=IEEE Docs Evaluator (Local)
@@ -116,15 +121,13 @@ app.openrouter.app-title=IEEE Docs Evaluator (Local)
 spring.jpa.show-sql=false
 ```
 
-### Local Teammate Workflow (Safe for Render/Vercel)
+### Local Development Workflow
 
-This project is deployment-configured, but local development remains fully supported.
+This project is deployment-configured, but local development is fully supported.
 
-1. **Do not edit** deployment files for local secrets.
-2. Put local backend secrets only in:
-  - `Backend/docs-evaluator/src/main/resources/application-secrets.properties` (already git-ignored)
-3. Put local frontend secrets only in:
-  - `Frontend/.env.local` (already git-ignored by `*.local`)
+1. Do not edit deployment files for local secrets.
+2. Put local backend secrets only in `Backend/docs-evaluator/src/main/resources/application-secrets.properties` (already git-ignored).
+3. Put local frontend secrets only in `Frontend/.env.local` (already git-ignored).
 4. Start services locally:
 
 ```bash
@@ -138,58 +141,57 @@ npm install
 npm run dev
 ```
 
-This local workflow does not affect Render/Vercel configuration.
-
 ---
 
-## ☁️ Deployment (Render + Vercel)
+## Deployment (Render + Vercel)
 
-### Backend → Render
+### Backend on Render
 
 1. Create a Render Web Service from this repository.
-2. Use the backend root directory: `Backend/docs-evaluator`.
-3. Deploy via Blueprint using `render.yaml` at repo root.
-4. If Render reports `invalid runtime java`, keep using Blueprint and Docker mode (already configured in `render.yaml`).
-5. Configure these environment variables in Render:
-  - `SPRING_DATASOURCE_URL`
-  - `SPRING_DATASOURCE_USERNAME`
-  - `SPRING_DATASOURCE_PASSWORD`
-  - `CORS_ALLOWED_ORIGINS` (include your Vercel URL, optionally localhost)
-  - `GOOGLE_SHEET_ID`
-  - `GOOGLE_SERVICE_ACCOUNT_JSON` **or** `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64`
-  - `OPENROUTER_HTTP_REFERER` (recommended: your frontend URL)
-  - `OPENROUTER_APP_TITLE`
+2. Set the backend root directory to `Backend/docs-evaluator`.
+3. Deploy via Blueprint using `render.yaml` at the repo root.
+4. Configure the following environment variables in Render:
 
-The backend now uses non-interactive service-account credentials for Google APIs (Render-safe) and centralized CORS via `CORS_ALLOWED_ORIGINS`.
+| Key | Description |
+|---|---|
+| `SPRING_DATASOURCE_URL` | Supabase pooler JDBC connection string |
+| `SPRING_DATASOURCE_USERNAME` | Supabase database username |
+| `SPRING_DATASOURCE_PASSWORD` | Supabase database password |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated list of allowed origins (include your Vercel URL) |
+| `GOOGLE_SHEET_ID` | Google Spreadsheet ID for roster and submissions |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` or `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` | Google service account credentials (provide one) |
+| `OPENROUTER_HTTP_REFERER` | Your frontend URL |
+| `OPENROUTER_APP_TITLE` | Application title shown in API requests |
 
-### Frontend → Vercel
+AI provider credentials (OpenAI API key and model) are stored in the database via the System Settings panel in the teacher dashboard — they do not need to be set as environment variables.
 
-1. Import the same repository in Vercel.
-2. Set project root directory to `Frontend`.
-3. Vercel build settings:
-  - Install command: `npm ci`
-  - Build command: `npm run build`
-  - Output directory: `dist`
-4. Configure these environment variables in Vercel:
-  - `VITE_API_BASE_URL` (e.g. `https://<render-service>.onrender.com/api`)
-  - `VITE_SUPABASE_URL`
-  - `VITE_SUPABASE_ANON_KEY`
-  - `VITE_GOOGLE_CLIENT_ID`
+### Frontend on Vercel
 
-### Local verification before deploy
+1. Import the repository in Vercel.
+2. Set the project root directory to `Frontend`.
+3. Build settings:
+   - Install command: `npm ci`
+   - Build command: `npm run build`
+   - Output directory: `dist`
+4. Configure the following environment variables in Vercel:
 
-Frontend:
+| Key | Description |
+|---|---|
+| `VITE_API_BASE_URL` | Your Render backend URL, e.g. `https://<service>.onrender.com/api` |
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anonymous key |
+| `VITE_GOOGLE_CLIENT_ID` | Google OAuth client ID |
+
+### Pre-deploy verification
 
 ```bash
+# Frontend
 cd Frontend
 npm ci
 npm run lint
 npm run build
-```
 
-Backend:
-
-```bash
+# Backend
 cd Backend/docs-evaluator
 ./mvnw test
 ./mvnw clean package
@@ -197,24 +199,37 @@ cd Backend/docs-evaluator
 
 ---
 
-## 👥 User Roles
+## User Roles
 
 ### Teacher
-- Upload a class list (CSV/XLSX) to register students
-- Create and manage Google Drive folders per document type
-- View all student submissions and their AI evaluation results
-- Provide manual scores and written feedback
+
+- View all student submissions synced from Google Sheets
+- Run AI evaluation on any submission using an OpenAI model
+- Configure the evaluation rubric, diagram analysis instructions, and prompt steps per document type
+- Edit and annotate AI-generated evaluation reports
+- Send evaluation results to the student dashboard
+- Manage system settings including the OpenAI API key and model selection
 
 ### Student
-- Submit documents (SRS, SDD, STD, SPMP) via Google Drive link
-- Trigger AI evaluation on submitted documents
-- View AI evaluation results (scores, strengths, weaknesses, feedback)
-- View teacher scores and feedback
+
+- View AI evaluation reports sent by the professor
+- See inline annotation comments left by the professor
+- Filter evaluations by document type (SRS, SDD, SPMP, STD)
 
 ---
 
+## Supported Document Types
 
-## 👨‍💻 Proponents
+| Type | Standard |
+|---|---|
+| SRS | IEEE 830 — Software Requirements Specification |
+| SDD | IEEE 1016 — Software Design Description |
+| SPMP | IEEE 1058 — Software Project Management Plan |
+| STD | IEEE 829 — Software Test Documentation |
+
+---
+
+## Proponents
 
 Groups 2, 3, 6, and 11 — IT411 Capstone and Research 2 (G01 + G02)
 College of Computer Studies, Cebu Institute of Technology - University
@@ -242,10 +257,10 @@ AY 2025–2026, 2nd Semester
 | Verano, Joel |
 | Ygot, Dante |
 
-**Adviser:** Sir Ralph P. Laviste
+Adviser: Sir Ralph P. Laviste
 
 ---
 
-## 📄 License
+## License
 
 This project is developed as an academic requirement for IT411 at Cebu Institute of Technology - University. All rights reserved by the respective proponents.
