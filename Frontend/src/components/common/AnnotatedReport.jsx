@@ -54,18 +54,6 @@ export default function AnnotatedReport({
         window.getSelection()?.removeAllRanges();
     }
 
-    useEffect(() => {
-        if (!popover) return;
-        function onScroll() { handleDismiss(); }
-        function onResize() { handleDismiss(); }
-        window.addEventListener('scroll', onScroll, true);
-        window.addEventListener('resize', onResize);
-        return () => {
-            window.removeEventListener('scroll', onScroll, true);
-            window.removeEventListener('resize', onResize);
-        };
-    }, [popover]);
-
     return (
         <div style={{ position: 'relative' }}>
             {canAnnotate && (
