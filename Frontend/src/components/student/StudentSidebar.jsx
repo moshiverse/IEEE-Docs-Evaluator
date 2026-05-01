@@ -1,7 +1,8 @@
 import { signOut } from '../../services/authService';
+import TutorialButton from '../common/TutorialButton';
 import appLogo from '../../assets/logo.png';
 
-function StudentSidebar({ studentData, teamMembers = [] }) {
+function StudentSidebar({ studentData, teamMembers = [], onTutorialStart }) {
   return (
     <aside className="student-sidebar">
       <div className="student-sidebar__brand">
@@ -43,6 +44,10 @@ function StudentSidebar({ studentData, teamMembers = [] }) {
       )}
 
       <div className="student-sidebar__spacer" />
+
+      {onTutorialStart && (
+        <TutorialButton onClick={onTutorialStart} label="Quick Tutorial" />
+      )}
 
       <button className="btn btn--ghost student-sidebar__signout" onClick={signOut}>
         Sign Out

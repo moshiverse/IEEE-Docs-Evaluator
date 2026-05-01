@@ -19,9 +19,20 @@ export default function AnnotationBubble({ index, annotation, canDelete = false,
         setOpen((p) => !p);
     }
 
+    function updatePosition() {
+        if (!bubbleRef.current) return;
+        const rect = bubbleRef.current.getBoundingClientRect();
+        setPos({
+            top:  Math.min(rect.bottom + 8, window.innerHeight - 240),
+            left: Math.min(rect.left - 8,   window.innerWidth  - 300),
+        });
+    }
+
     // Close on outside click or Escape
     useEffect(() => {
         if (!open) return;
+        updatePosition();
+
         function onKey(e)  { if (e.key === 'Escape') setOpen(false); }
         function onDown(e) {
             if (
@@ -29,11 +40,17 @@ export default function AnnotationBubble({ index, annotation, canDelete = false,
                 popoverRef.current && !popoverRef.current.contains(e.target)
             ) setOpen(false);
         }
+        function onScroll() { updatePosition(); }
+        function onResize() { updatePosition(); }
         document.addEventListener('keydown', onKey);
         document.addEventListener('mousedown', onDown);
+        window.addEventListener('scroll', onScroll, true);
+        window.addEventListener('resize', onResize);
         return () => {
             document.removeEventListener('keydown', onKey);
             document.removeEventListener('mousedown', onDown);
+            window.removeEventListener('scroll', onScroll, true);
+            window.removeEventListener('resize', onResize);
         };
     }, [open]);
 

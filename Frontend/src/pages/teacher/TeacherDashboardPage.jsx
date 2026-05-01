@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PanelHeader from '../../components/common/PanelHeader';
 import ToastMessage from '../../components/common/ToastMessage';
 import TeacherAnalyzeModal from '../../components/teacher/TeacherAnalyzeModal';
@@ -9,16 +9,27 @@ import TeacherHistoryTable from '../../components/teacher/TeacherHistoryTable';
 import TeacherSettingsPanel from '../../components/teacher/TeacherSettingsPanel';
 import TeacherSidebar from '../../components/teacher/TeacherSidebar';
 import TeacherSubmissionsTable from '../../components/teacher/TeacherSubmissionsTable';
+import TutorialOverlay from '../../components/common/TutorialOverlay';
 import ProfessorWorkspacePage from './ProfessorWorkspacePage';
 import { useTeacherDashboard } from '../../hooks/useTeacherDashboard';
 import { useTheme } from '../../hooks/useTheme';
+import { useTutorial } from '../../hooks/useTutorial';
 import { useToast } from '../../hooks/useToast';
+import { teacherTutorialSteps } from '../../tutorials/teacherTutorial';
+import { TUTORIAL_TYPES } from '../../tutorials/tutorialConfig';
 import '../../styles/pages/teacher-dashboard.css';
 import '../../styles/components/layout.css';
+import '../../styles/components/tutorial.css';
 
-function TeacherDashboardPage() {
+function TeacherDashboardPage({ user }) {
   const { toast, showToast } = useToast();
   const { themeMode, setThemeMode } = useTheme();
+  const tutorial = useTutorial({
+    tutorialType: TUTORIAL_TYPES.TEACHER,
+    userKey: user?.email || user?.googleEmail || user?.studentName,
+    maxRuns: 2,
+    autoStart: true,
+  });
   const vm = useTeacherDashboard(showToast);
   const [isSubmissionHistoryOpen, setIsSubmissionHistoryOpen] = useState(false);
   const [submissionHistoryFile, setSubmissionHistoryFile] = useState(null);
@@ -69,6 +80,27 @@ function TeacherDashboardPage() {
     setIsSubmissionHistoryFlow(false);
   }
 
+  useEffect(() => {
+    if (!tutorial.isTutorialOpen) return;
+
+    const stepIndex = tutorial.currentStepIndex;
+    if (stepIndex === 3) {
+      vm.setCurrentView('reports');
+      return;
+    }
+    if (stepIndex === 4) {
+      vm.setCurrentView('workspace');
+      return;
+    }
+    if (stepIndex === 5) {
+      vm.setCurrentView('settings');
+      return;
+    }
+    if (stepIndex >= 6 && vm.currentView !== 'submissions') {
+      vm.setCurrentView('submissions');
+    }
+  }, [tutorial.currentStepIndex, tutorial.isTutorialOpen, vm]);
+
   return (
     <div className="layout layout--teacher">
       <ToastMessage toast={toast} />
@@ -76,6 +108,16 @@ function TeacherDashboardPage() {
       <TeacherSidebar
         currentView={vm.currentView}
         onNavigate={vm.setCurrentView}
+        onTutorialStart={tutorial.startTutorial}
+      />
+
+      <TutorialOverlay
+        steps={teacherTutorialSteps}
+        run={tutorial.isTutorialOpen}
+        stepIndex={tutorial.currentStepIndex}
+        onNext={() => tutorial.nextStep(teacherTutorialSteps.length)}
+        onPrev={tutorial.prevStep}
+        onClose={tutorial.closeTutorial}
       />
 
       <main className="layout__main">

@@ -3,13 +3,24 @@ import PanelHeader from '../../components/common/PanelHeader';
 import StudentReportModal from '../../components/student/StudentReportModal';
 import StudentReportsTable from '../../components/student/StudentReportsTable';
 import StudentSidebar from '../../components/student/StudentSidebar';
+import TutorialOverlay from '../../components/common/TutorialOverlay';
 import { useStudentReports } from '../../hooks/useStudentReports';
+import { useTutorial } from '../../hooks/useTutorial';
+import { studentTutorialSteps } from '../../tutorials/studentTutorial';
+import { TUTORIAL_TYPES } from '../../tutorials/tutorialConfig';
 import '../../styles/pages/student-dashboard.css';
 import '../../styles/components/layout.css';
+import '../../styles/components/tutorial.css';
 import { getStudentReportById } from '../../api'
 
 function StudentDashboardPage({ studentData }) {
   const vm = useStudentReports(studentData.groupCode);
+  const tutorial = useTutorial({
+    tutorialType: TUTORIAL_TYPES.STUDENT,
+    userKey: studentData?.email || studentData?.googleEmail || studentData?.studentName,
+    maxRuns: 2,
+    autoStart: true,
+  });
   const [selectedReport, setSelectedReport] = useState(null);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
 
@@ -32,7 +43,20 @@ async function handleOpenReport(reportSummary) {
 
   return (
     <div className="layout layout--student">
-      <StudentSidebar studentData={studentData} teamMembers={vm.teamMembers} />
+      <StudentSidebar
+        studentData={studentData}
+        teamMembers={vm.teamMembers}
+        onTutorialStart={tutorial.startTutorial}
+      />
+
+      <TutorialOverlay
+        steps={studentTutorialSteps}
+        run={tutorial.isTutorialOpen}
+        stepIndex={tutorial.currentStepIndex}
+        onNext={() => tutorial.nextStep(studentTutorialSteps.length)}
+        onPrev={tutorial.prevStep}
+        onClose={tutorial.closeTutorial}
+      />
 
       <main className="layout__main">
         <PanelHeader
