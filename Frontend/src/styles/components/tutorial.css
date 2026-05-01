@@ -1,0 +1,140 @@
+.tutorial-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  border-radius: 0.6rem;
+  background: transparent;
+  color: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.tutorial-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(56, 189, 248, 0.9);
+  color: #0ea5e9;
+}
+
+.tutorial-button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+}
+
+.tutorial-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.55), rgba(8, 15, 35, 0.75));
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.tutorial-spotlight {
+  position: absolute;
+  z-index: 2;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(8, 15, 35, 0.45);
+  border: 2px solid rgba(56, 189, 248, 0.85);
+  background: rgba(255, 255, 255, 0.02);
+  pointer-events: none;
+}
+
+.tutorial-tooltip {
+  position: absolute;
+  z-index: 3;
+  width: 340px;
+  padding: 1.1rem 1.1rem 0.95rem;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #0f172a 0%, #111827 100%);
+  color: #e2e8f0;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  animation: tutorial-fade-in 0.2s ease;
+  pointer-events: auto;
+}
+
+.tutorial-tooltip--center {
+  animation: tutorial-center-in 0.18s ease;
+}
+
+.tutorial-tooltip__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  margin-bottom: 0.75rem;
+}
+
+.tutorial-tooltip__close {
+  border: none;
+  background: transparent;
+  color: #cbd5f5;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.tutorial-tooltip__content {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.tutorial-tooltip__hint {
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.85);
+  margin-bottom: 0.85rem;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.tutorial-tooltip__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tutorial-tooltip__spacer {
+  flex: 1;
+}
+
+@keyframes tutorial-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tutorial-center-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}

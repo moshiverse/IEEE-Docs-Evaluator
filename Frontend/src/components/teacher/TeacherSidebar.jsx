@@ -1,4 +1,5 @@
 import { signOut } from '../../services/authService';
+import TutorialButton from '../common/TutorialButton';
 import appLogo from '../../assets/logo.png';
 
 const NAV_ITEMS = [
@@ -8,7 +9,7 @@ const NAV_ITEMS = [
   { key: 'settings',    label: 'System Settings' },
 ];
 
-function TeacherSidebar({ currentView, onNavigate }) {
+function TeacherSidebar({ currentView, onNavigate, onTutorialStart }) {
   return (
     <aside className="teacher-sidebar">
       <div className="teacher-sidebar__brand">
@@ -30,6 +31,10 @@ function TeacherSidebar({ currentView, onNavigate }) {
       </nav>
 
       <div className="teacher-sidebar__spacer" />
+
+      {onTutorialStart && (
+        <TutorialButton onClick={onTutorialStart} label="Quick Tutorial" />
+      )}
 
       <button className="btn btn--ghost teacher-sidebar__signout" onClick={signOut}>
         Sign Out
