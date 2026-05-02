@@ -14,45 +14,61 @@ import AnnotationBubble from './AnnotationBubble';
  * We sort by startOffset descending so that inserting later markers doesn't
  * shift the positions of earlier ones.
  */
+function normalizeChars(str) {
+    if (!str) return '';
+    return str
+        .replace(/\r\n/g, '\n')            // Windows line endings → Unix
+        .replace(/\r/g, '\n')              // old Mac line endings → Unix
+        .replace(/[\u2018\u2019]/g, "'")   // curly single quotes → '
+        .replace(/[\u201C\u201D]/g, '"')   // curly double quotes → "
+        .replace(/[\u2013\u2014]/g, '--')  // en/em dash → --
+        .replace(/\u00A0/g, ' ');          // non-breaking space → space
+}
+
 function injectAnnotationMarkers(text, annotations) {
     if (!text || !annotations || annotations.length === 0) return text;
 
-    // Sort by startOffset descending so insertions don't shift earlier positions
     const sorted = [...annotations].sort((a, b) => b.startOffset - a.startOffset);
 
     let result = text;
+
     sorted.forEach((ann) => {
         const marker = `[ANN:${ann.id}]`;
         const sel    = ann.selectedText;
         if (!sel || result.includes(marker)) return;
 
-        // Strategy 1: try offset-based with a generous ±50 char window
-        const start  = ann.startOffset || 0;
-        const end    = ann.endOffset   || (start + sel.length);
-        const window = 50;
-        const sliceStart = Math.max(0, start - window);
-        const slice  = result.slice(sliceStart, end + window);
+        // Recompute on each iteration so offsets stay aligned after insertions
+        const normalizedResult = normalizeChars(result);
+        const normalizedSel    = normalizeChars(sel);
 
-        if (slice.includes(sel)) {
-            const localIdx = slice.indexOf(sel);
-            const absEnd   = sliceStart + localIdx + sel.length;
+        // Strategy 1: offset-based with ±50 char window on normalized text
+        const start      = ann.startOffset || 0;
+        const end        = ann.endOffset   || (start + sel.length);
+        const window     = 50;
+        const sliceStart = Math.max(0, start - window);
+        const normalizedSlice = normalizedResult.slice(sliceStart, end + window);
+
+        if (normalizedSlice.includes(normalizedSel)) {
+            const localIdx = normalizedSlice.indexOf(normalizedSel);
+            const absEnd   = sliceStart + localIdx + normalizedSel.length;
             result = result.slice(0, absEnd) + marker + result.slice(absEnd);
             return;
         }
 
-        // Strategy 2: full text search — find first occurrence
-        const idx = result.indexOf(sel);
+        // Strategy 2: full normalized text search
+        const idx = normalizedResult.indexOf(normalizedSel);
         if (idx !== -1) {
-            result = result.slice(0, idx + sel.length) + marker + result.slice(idx + sel.length);
+            const absEnd = idx + normalizedSel.length;
+            result = result.slice(0, absEnd) + marker + result.slice(absEnd);
             return;
         }
 
-        // Strategy 3: partial match — use first 40 chars of selectedText
-        const partial = sel.slice(0, 40);
+        // Strategy 3: partial match on first 40 chars of normalized selectedText
+        const partial = normalizedSel.slice(0, 40);
         if (partial.length >= 10) {
-            const pidx = result.indexOf(partial);
+            const pidx = normalizedResult.indexOf(partial);
             if (pidx !== -1) {
-                const insertAt = pidx + sel.length;
+                const insertAt = pidx + normalizedSel.length;
                 result = result.slice(0, insertAt) + marker + result.slice(insertAt);
             }
         }
@@ -426,8 +442,8 @@ function EvaluationReport({ text, images = [], annotations = [], canDelete = fal
 
     // Inject [ANN:N] markers into the text before parsing
     const markedText = useMemo(
-        () => injectAnnotationMarkers(text, annotations),
-        [text, annotations],
+    () => injectAnnotationMarkers(text?.replace(/\r\n/g, '\n').replace(/\r/g, '\n'), annotations),
+    [text, annotations],
     );
 
     const parsed = useMemo(() => parseEvaluationSections(markedText), [markedText]);

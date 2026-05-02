@@ -68,77 +68,47 @@ function StudentReportModal({ report, onClose }) {
             {/* Annotation list */}
             {!collapsed && (
               <div style={{ padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                {annotations.map((ann, idx) => {
-                  const fullText   = report?.evaluationResult || '';
-                  const start      = ann.startOffset || 0;
-                  const contextLen = 45;
-                  const before     = fullText.slice(Math.max(0, start - contextLen), start).trimStart();
-                  const locationHint = before.length > 0 ? `…${before}` : null;
-
-                  return (
-                    <div key={ann.id} style={{
-                      display: 'flex', gap: '0.65rem',
-                      padding: '0.75rem 0.9rem',
-                      borderRadius: '10px',
-                      border: '1px solid color-mix(in srgb, #f59e0b 20%, var(--line-soft))',
-                      background: 'var(--bg-surface)',
+                {annotations.map((ann, idx) => (
+                  <div key={ann.id} style={{
+                    display: 'flex', gap: '0.65rem',
+                    padding: '0.75rem 0.9rem',
+                    borderRadius: '10px',
+                    border: '1px solid color-mix(in srgb, #f59e0b 20%, var(--line-soft))',
+                    background: 'var(--bg-surface)',
+                  }}>
+                    {/* Number badge */}
+                    <div style={{
+                      flexShrink: 0, width: '22px', height: '22px', borderRadius: '50%',
+                      background: '#f59e0b', color: '#fff',
+                      fontSize: '0.72rem', fontWeight: 800,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      marginTop: '2px',
                     }}>
-                      {/* Number badge */}
-                      <div style={{
-                        flexShrink: 0, width: '22px', height: '22px', borderRadius: '50%',
-                        background: '#f59e0b', color: '#fff',
-                        fontSize: '0.72rem', fontWeight: 800,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        marginTop: '2px',
-                      }}>
-                        {idx + 1}
-                      </div>
-
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        {/* Location hint */}
-                        {locationHint && (
-                          <p style={{
-                            margin: '0 0 0.2rem',
-                            fontSize: '0.72rem', color: 'var(--text-muted)',
-                            fontFamily: 'monospace', letterSpacing: '0.01em',
-                          }}>
-                            {locationHint}
-                            <span style={{
-                              display: 'inline-block',
-                              background: '#f59e0b', color: '#fff',
-                              borderRadius: '4px', padding: '0 4px',
-                              fontSize: '0.65rem', fontWeight: 800,
-                              marginLeft: '3px', verticalAlign: 'middle',
-                            }}>
-                              {idx + 1}
-                            </span>
-                          </p>
-                        )}
-
-                        {/* Quoted text */}
-                        <p style={{
-                          margin: '0 0 0.35rem',
-                          fontSize: '0.78rem', color: 'var(--text-muted)',
-                          fontStyle: 'italic', lineHeight: 1.45,
-                          borderLeft: '2px solid #f59e0b', paddingLeft: '0.5rem',
-                        }}>
-                          "{ann.selectedText.length > 120
-                            ? ann.selectedText.slice(0, 120) + '…'
-                            : ann.selectedText}"
-                        </p>
-
-                        {/* Comment */}
-                        <p style={{
-                          margin: 0,
-                          fontSize: '0.9rem', color: 'var(--text-main)',
-                          lineHeight: 1.6, whiteSpace: 'pre-wrap',
-                        }}>
-                          {ann.comment}
-                        </p>
-                      </div>
+                      {idx + 1}
                     </div>
-                  );
-                })}
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Quoted text */}
+                      <p style={{
+                        margin: '0 0 0.35rem',
+                        fontSize: '0.78rem', color: 'var(--text-muted)',
+                        fontStyle: 'italic', lineHeight: 1.45,
+                        borderLeft: '2px solid #f59e0b', paddingLeft: '0.5rem',
+                      }}>
+                        "{ann.selectedText}"
+                      </p>
+
+                      {/* Comment */}
+                      <p style={{
+                        margin: 0,
+                        fontSize: '0.9rem', color: 'var(--text-main)',
+                        lineHeight: 1.6, whiteSpace: 'pre-wrap',
+                      }}>
+                        {ann.comment}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
