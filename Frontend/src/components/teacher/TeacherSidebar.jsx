@@ -56,20 +56,6 @@ function TeacherSidebar({ currentView, onNavigate, onTutorialStart }) {
             {item.label}
           </button>
         ))}
-        <button
-          type="button"
-          className="btn btn--ghost teacher-sidebar__theme-toggle"
-          onClick={toggleTheme}
-          aria-label={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          title={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          <span className="teacher-sidebar__theme-icon" aria-hidden="true">
-            {themeIcon}
-          </span>
-          <span className="teacher-sidebar__theme-label">
-            {themeMode === 'dark' ? 'Light' : 'Dark'}
-          </span>
-        </button>
       </nav>
 
       <div className="teacher-sidebar__spacer" />

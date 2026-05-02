@@ -71,7 +71,7 @@ export default function AnnotatedReport({
                         background: 'var(--brand)', color: '#fff',
                         fontSize: '0.7rem', fontWeight: 800, flexShrink: 0,
                     }}>i</span>
-                    Select any text in the report below to add an annotation comment.
+                    Select any text in the report below to add an annotation comment. Annotations are not supported in the Document Information section.
                 </div>
             )}
 

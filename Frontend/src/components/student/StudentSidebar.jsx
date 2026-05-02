@@ -44,6 +44,21 @@ function StudentSidebar({ studentData, teamMembers = [], onTutorialStart }) {
         <span className="student-profile__meta">{studentData.section}</span>
       </div>
 
+            <button
+        type="button"
+        className="btn btn--ghost student-sidebar__theme-toggle"
+        onClick={toggleTheme}
+        aria-label={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        title={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        <span className="student-sidebar__theme-icon" aria-hidden="true">
+          {themeIcon}
+        </span>
+        <span className="student-sidebar__theme-label">
+          {themeMode === 'dark' ? 'Light' : 'Dark'}
+        </span>
+      </button>
+      
       <div className="student-detail">
         <span className="student-detail__key">Team Code</span>
         <span className="student-detail__value">{studentData.groupCode}</span>
@@ -70,21 +85,6 @@ function StudentSidebar({ studentData, teamMembers = [], onTutorialStart }) {
           </ul>
         </div>
       )}
-
-      <button
-        type="button"
-        className="btn btn--ghost student-sidebar__theme-toggle"
-        onClick={toggleTheme}
-        aria-label={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        title={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      >
-        <span className="student-sidebar__theme-icon" aria-hidden="true">
-          {themeIcon}
-        </span>
-        <span className="student-sidebar__theme-label">
-          {themeMode === 'dark' ? 'Light' : 'Dark'}
-        </span>
-      </button>
 
       <div className="student-sidebar__spacer" />
 
